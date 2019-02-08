@@ -184,6 +184,11 @@ add_executable(csmd ${CSM_DAEMON_SRC})
 
 add_dependencies(csmd_lib ${CSMD_BUILD_DEPENDENCIES})
 
+#find_package(Libpam REQUIRED)
+find_library(PAM_LIBRARY NAMES libpam PATHS  /usr/lib64/ /usr/lib64/security)
+include_directories(${PAM_INCLUDE_PATH})
+
+
 #uncommnet below if we want to debug Boost.Asio
 #add_definitions(-DBOOST_ASIO_ENABLE_HANDLER_TRACKING)
 
@@ -196,7 +201,7 @@ include_directories(
 )
 
 #target_include_directories(csmd PRIVATE ./ ${BASEDIR}/csmdb/api/include ${CMAKE_SOURCE_DIR}/csmd/src/)
-target_link_libraries(csmd csm_network_cc fsutil csmi_serialization csmutil csmras ${Boost_LIBRARIES} -lpthread -lpq)
+target_link_libraries(csmd csm_network_cc fsutil csmi_serialization csmutil csmras ${Boost_LIBRARIES} -lpthread -lpq -lpam -lpam_misc)
 
 install(TARGETS csmd COMPONENT csm-core DESTINATION csm/sbin)
 

@@ -23,6 +23,10 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include "cgroup.h"
+#include <security/pam_appl.h>
+#include <security/pam_misc.h>
+
+extern char **environ;
 
 namespace csm {
 namespace daemon {
@@ -39,6 +43,12 @@ namespace helper {
 
 static const std::string PROC_DIR = "/proc/";
 static const std::string FD_DIR = "/fd/";
+
+static struct pam_conv conv = {
+    misc_conv,
+    NULL
+};
+
 
 bool ClearFileDescriptors( pid_t pid)
 {
@@ -201,7 +211,7 @@ int ForkAndExecAllocationCGroup(char * const argv[], uint64_t allocation_id, uid
         {
             // Setup the cgroup.
             csm::daemon::helper::CGroup cgroup = csm::daemon::helper::CGroup( allocation_id );
-            cgroup.MigratePid(execPid);
+            //cgroup.MigratePid(execPid);
             _Exit(0);
         }
 
@@ -236,19 +246,36 @@ int ForkAndExecAllocationCGroup(char * const argv[], uint64_t allocation_id, uid
                 _Exit(-1);
             }
 
-
             // Wait on the PID migration then execute.
             try
             {
                 csm::daemon::helper::CGroup cgroup = csm::daemon::helper::CGroup( allocation_id );
                 
                 LOG(csmapi, trace) << "Waiting on pid #" << getpid() << " migration allocation: " << allocation_id;
-                if(cgroup.WaitPidMigration(getpid()) && argv)
+                if(true)// || cgroup.WaitPidMigration(getpid()) && argv)
                 {
                     LOG(csmapi, trace) << "Pid #" << getpid() << " migrated allocation: " << allocation_id;
-                    LOG(csmapi, trace) << "Executing \"" << *argv << "\"";
-                   _Exit(execv(*argv, argv));
-                    
+                    LOG(csmapi, trace) << "Executing \"" << *argv << "\" as " << pw->pw_name;
+
+                    // start a pam session
+                    int rc = -1;
+                    int pam_err = 0;
+                    pam_handle_t *pamh;
+
+                    pam_err  = pam_start( "sshd", pw->pw_name, &conv, &pamh); 
+                    if ( pam_err == PAM_SUCCESS && (pam_err = pam_open_session(pamh, 0)) == PAM_SUCCESS )
+                    {
+                        _Exit(execve(*argv, argv, environ));
+                    //    LOG(csmapi, trace) << "Script has been executed. Return Code: " << rc;
+                  //      pam_err = pam_close_session(pamh, 0);
+                    }
+                    else
+                    {
+                        LOG(csmapi, trace) << "Pam Session failed to open for Allocation: " << allocation_id;
+                    }
+
+                    pam_end(pamh, pam_err);
+                   _Exit(rc);
                 }
             }
             catch ( const std::exception& e )
