@@ -25,6 +25,10 @@ extern const csmi_struct_mapping_t map_csm_node_error_t;
 
 extern const csmi_struct_mapping_t map_csmi_err_t;
 
+extern const csmi_struct_mapping_t map_csmi_ulimit_t;
+
+extern const csmi_struct_mapping_t map_csmi_user_info_t;
+
 
 #ifdef __cplusplus
 }

@@ -19,12 +19,12 @@
 #include <dirent.h>    ///< DIR and Directory sys calls.
 #include "logging.h"   ///< CSM logging.
 #include <pwd.h>
-#include <grp.h> 
 #include <sys/types.h>
 #include <sys/wait.h>
 #include "cgroup.h"
-#include <security/pam_appl.h>
-#include <security/pam_misc.h>
+#include <grp.h>
+//#include <security/pam_appl.h>
+//#include <security/pam_misc.h>
 
 extern char **environ;
 
@@ -44,10 +44,10 @@ namespace helper {
 static const std::string PROC_DIR = "/proc/";
 static const std::string FD_DIR = "/fd/";
 
-static struct pam_conv conv = {
-    misc_conv,
-    NULL
-};
+//static struct pam_conv conv = {
+//    misc_conv,
+//    NULL
+//};
 
 
 bool ClearFileDescriptors( pid_t pid)
@@ -88,54 +88,20 @@ void ProcessExit(int sig)
     while(waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
 }
 
-int ForkAndExecCapture( char * const argv[], char **output, uid_t user_id, int timeout_seconds)
+int ForkAndExecCapture( char * const argv[], char **output, csmi_user_info_t* info, int timeout_seconds)
 {
     #define FROM_CHILD 0
     #define TO_PARENT 1
     #define BUFFER_SIZE 1024
     int uni_pipe[2];
     int status = 0;
-    int rc;
     pipe(uni_pipe);
     pid_t execPid = fork();
     
     // Clear old fd first.
-    if ( execPid == 0  )
+    if ( execPid == 0 && info )
     {
-        // Get this pid to be sure the correct fd is closed.
-        //pid_t forkPid = getpid();
-        //ClearFileDescriptors(forkPid);
-        // Set the userid.
-        passwd *pw = getpwuid(user_id);
-        if (pw)
-        {
-            #define MaxGroups 1024  // LDAP limit is slightly less than 1024
-            int ngroups = MaxGroups;
-            gid_t groups[MaxGroups];
-            
-            if( getgrouplist(pw->pw_name, pw->pw_gid, groups, &ngroups) != -1)
-            {
-                rc = setregid(pw->pw_gid, pw->pw_gid);
-                if(rc)
-                {
-                    // \todo bail out due to failure
-                    _Exit(-1);
-                }
-                rc = setgroups(ngroups, groups);
-                if(rc)
-                {
-                    // \todo bail out due to failure
-                    _Exit(-1);
-                }
-            }
-            rc = setreuid(user_id, user_id);  // must set UID last
-            if(rc)
-            {
-                // \todo bail out due to failure
-                _Exit(-1);
-            }
-        }
-        else
+        if( apply_user_info(info) )
         {
             // \todo pw lookup failure, exit
             _Exit(-1);
@@ -195,13 +161,12 @@ int ForkAndExecCapture( char * const argv[], char **output, uid_t user_id, int t
     return WEXITSTATUS(status);
 }
 
-int ForkAndExecAllocationCGroup(char * const argv[], uint64_t allocation_id, uid_t user_id)
+int ForkAndExecAllocationCGroup(char * const argv[], uint64_t allocation_id, csmi_user_info_t* info)
 {
     #define FROM_CHILD 0
     #define TO_PARENT 1
     #define BUFFER_SIZE 1024
     int status = 0;
-    int rc;
     pid_t execPid = fork();
     
     if ( execPid == 0  )
@@ -215,74 +180,26 @@ int ForkAndExecAllocationCGroup(char * const argv[], uint64_t allocation_id, uid
             _Exit(0);
         }
 
-        // Set the userid.
-        passwd *pw = getpwuid(user_id);
-        if (pw)
+
+        // Wait on the PID migration then execute.
+        try
         {
-            #define MaxGroups 1024  // LDAP limit is slightly less than 1024
-            int ngroups = MaxGroups;
-            gid_t groups[MaxGroups];
+            csm::daemon::helper::CGroup cgroup = csm::daemon::helper::CGroup( allocation_id );
             
-            // TODO make this into a function.
-            if( getgrouplist(pw->pw_name, pw->pw_gid, groups, &ngroups) != -1)
+            LOG(csmapi, trace) << "Waiting on pid #" << getpid() << " migration allocation: " << allocation_id;
+            if( cgroup.WaitPidMigration(getpid()) && argv && apply_user_info(info))
             {
-                rc = setregid(pw->pw_gid, pw->pw_gid);
-                if(rc)
-                {
-                    // \todo bail out due to failure
+
+                if (!apply_user_info(info))
+                    _Exit(execve(*argv, argv, environ));
+                else
                     _Exit(-1);
-                }
-                rc = setgroups(ngroups, groups);
-                if(rc)
-                {
-                    // \todo bail out due to failure
-                    _Exit(-1);
-                }
             }
-            rc = setreuid(user_id, user_id);  // must set UID last
-            if(rc)
-            {
-                // \todo bail out due to failure
-                _Exit(-1);
-            }
-
-            // Wait on the PID migration then execute.
-            try
-            {
-                csm::daemon::helper::CGroup cgroup = csm::daemon::helper::CGroup( allocation_id );
-                
-                LOG(csmapi, trace) << "Waiting on pid #" << getpid() << " migration allocation: " << allocation_id;
-                if(true)// || cgroup.WaitPidMigration(getpid()) && argv)
-                {
-                    LOG(csmapi, trace) << "Pid #" << getpid() << " migrated allocation: " << allocation_id;
-                    LOG(csmapi, trace) << "Executing \"" << *argv << "\" as " << pw->pw_name;
-
-                    // start a pam session
-                    int rc = -1;
-                    int pam_err = 0;
-                    pam_handle_t *pamh;
-
-                    pam_err  = pam_start( "sshd", pw->pw_name, &conv, &pamh); 
-                    if ( pam_err == PAM_SUCCESS && (pam_err = pam_open_session(pamh, 0)) == PAM_SUCCESS )
-                    {
-                        _Exit(execve(*argv, argv, environ));
-                    //    LOG(csmapi, trace) << "Script has been executed. Return Code: " << rc;
-                  //      pam_err = pam_close_session(pamh, 0);
-                    }
-                    else
-                    {
-                        LOG(csmapi, trace) << "Pam Session failed to open for Allocation: " << allocation_id;
-                    }
-
-                    pam_end(pamh, pam_err);
-                   _Exit(rc);
-                }
-            }
-            catch ( const std::exception& e )
-            {
-                _Exit(-1);
-            }
-        } 
+        }
+        catch ( const std::exception& e )
+        {
+            _Exit(-1);
+        }
 
         _Exit(0);
     }

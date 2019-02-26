@@ -41,7 +41,7 @@
     #define CSMI_ARRAY_FIXED         0
     #define CSMI_ARRAY_STR           0
     #define CSMI_ARRAY_STR_FIXED     0
-    #define CSMI_STRUCT              0
+    #define CSMI_STRUCT              1
     #define CSMI_ARRAY_STRUCT        0
     #define CSMI_ARRAY_STRUCT_FIXED  0
     #define CSMI_NONE                0
@@ -54,8 +54,12 @@ CSMI_STRUCT_MEMBER(int64_t,  allocation_id, BASIC , ,    0, ) /**< The Allocatio
 CSMI_STRUCT_MEMBER( char*  ,  kv_pairs     , STRING, , NULL, ) /**< Arguments to the JSM run: Supports alphanumeric, ',' , and  '='. Exported to **CSM_JSM_ARGS**. */
 CSMI_STRUCT_MEMBER(char*  ,  jsm_path     , STRING, , NULL, ) /**< The fully qualified path to the JSM executable, if NULL ignored and the default path is used ( /opt/ibm/spectrum_mpi/jsm_pmix/bin/jsm ). */
 
+
 CSMI_VERSION_END(757d79d8d3d06d33ca5da9c9ca79808d)
 
+CSMI_VERSION_START(CSM_VERSION_1_6_0)
+CSMI_STRUCT_MEMBER(csmi_user_info_t*,user_info, STRUCT, , NULL, csmi_user_info_t) /**< A collection of user values. CSM USE ONLY!*/
+CSMI_VERSION_END(7f51c9b975b4784a7073e199faee8f37)
 
 #undef CSMI_VERSION_START
 #undef CSMI_VERSION_END

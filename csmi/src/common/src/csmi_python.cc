@@ -180,4 +180,16 @@ BOOST_PYTHON_MODULE(lib_csm_py)
 		.value("CSM_RAS_WARNING",CSM_RAS_WARNING)
 		.value("CSM_RAS_FATAL",CSM_RAS_FATAL);
 
+    class_<csmi_ulimit_t,csmi_ulimit_t*>("ulimit_t")
+		.add_property("resource", &csmi_ulimit_t::resource,&csmi_ulimit_t::resource," The ulimit Resource ID ")
+		.add_property("cur_limit", &csmi_ulimit_t::cur_limit,&csmi_ulimit_t::cur_limit," The current ulimit")
+		.add_property("max_limit", &csmi_ulimit_t::max_limit,&csmi_ulimit_t::max_limit," The Maximum ulimit");
+
+    class_<csmi_user_info_t,csmi_user_info_t*>("user_info_t")
+		STRING_PROPERTY(csmi_user_info_t, char*, user, , NULL, )
+		.add_property("uid", &csmi_user_info_t::uid,&csmi_user_info_t::uid," User id. ")
+		.add_property("gid", &csmi_user_info_t::gid,&csmi_user_info_t::gid," User group ID. ")
+		.add_property("num_ulimits", &csmi_user_info_t::num_ulimits,&csmi_user_info_t::num_ulimits," The number of ulimits captured. ")
+		ARRAY_STRUCT_PROPERTY(csmi_user_info_t, csmi_ulimit_t**, ulimits, num_ulimits, NULL, csmi_ulimit_t);
+
 };

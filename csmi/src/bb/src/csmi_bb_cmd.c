@@ -102,6 +102,9 @@ int csm_bb_cmd(
     
     flag_test(input->command_arguments, "command arguments")
 
+    // Populate the user information.
+    get_user_info(&(input->user_info));
+
     // EARLY RETURN
     // Construct the buffer.
     csm_serialize_struct(API_PARAMETER_INPUT_TYPE, input, &buffer, &buffer_length);

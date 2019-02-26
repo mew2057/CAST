@@ -217,7 +217,8 @@ BOOST_PYTHON_MODULE(lib_csm_bb_py)
     class_<csm_bb_cmd_input_t,csm_bb_cmd_input_t*>("bb_cmd_input_t")
 		.add_property("node_names_count", &csm_bb_cmd_input_t::node_names_count,&csm_bb_cmd_input_t::node_names_count," Number of  nodes to issue the burst buffer command on, size of @ref node_names. ")
 		STRING_PROPERTY(csm_bb_cmd_input_t, char*, command_arguments, , NULL, )
-		ARRAY_STR_PROPERTY(csm_bb_cmd_input_t, char**, node_names, node_names_count, NULL, );
+		ARRAY_STR_PROPERTY(csm_bb_cmd_input_t, char**, node_names, node_names_count, NULL, )
+		STRUCT_PROPERTY(csm_bb_cmd_input_t, csmi_user_info_t*, user_info, , NULL, &csm_bb_cmd_input_t::user_info);
 
     class_<csm_bb_cmd_output_t,csm_bb_cmd_output_t*>("bb_cmd_output_t")
 		STRING_PROPERTY(csm_bb_cmd_output_t, char*, command_output, , NULL, );

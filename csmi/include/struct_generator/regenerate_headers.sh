@@ -103,6 +103,13 @@ done 3< header_funct_comments.txt
 
 echo "Regenerating headers (should take about 2 seconds)"
 
+c_file=${OUTPUT_FILE_C[0]}
+build_copyright_header "${c_file}" > ${CSMI_DIR}/${c_file}
+
+c_int_file=${O_FILE_C_INT[0]}
+build_copyright_header  ${c_int_file} > ${CSMI_DIR}/${c_int_file}
+echo ${CSMI_DIR}/${c_int_file}
+
 failure_count=0
 missing_count=0
 index=0
@@ -114,6 +121,25 @@ do
 done
 
 wait
+
+# Consolidate C files
+index=0
+for dir in ${STRUCT_DIRS[@]}
+do
+    if [  ${index} -gt 0 ]
+    then
+        echo ${dir}
+        cat ${CSMI_DIR}/${OUTPUT_FILE_C[${index}]} >>  ${CSMI_DIR}/${c_file}
+        rm -f ${CSMI_DIR}/${OUTPUT_FILE_C[${index}]}
+        cat ${CSMI_DIR}/${O_FILE_C_INT[${index}]}  >>  ${CSMI_DIR}/${c_int_file}
+        rm -f ${CSMI_DIR}/${O_FILE_C_INT[${index}]}
+    fi
+
+    ((index+=1))
+done
+
+
+
 
 # TODO Clean this up.
 ./generate_print_formatter.pl c >> "${CSMI_DIR}/src/common/src/csmi_common_internal.c"

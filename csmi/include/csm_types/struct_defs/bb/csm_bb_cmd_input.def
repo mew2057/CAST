@@ -44,7 +44,7 @@
     #define CSMI_ARRAY_FIXED         0
     #define CSMI_ARRAY_STR           1
     #define CSMI_ARRAY_STR_FIXED     0
-    #define CSMI_STRUCT              0
+    #define CSMI_STRUCT              1
     #define CSMI_ARRAY_STRUCT        0
     #define CSMI_ARRAY_STRUCT_FIXED  0
     #define CSMI_NONE                0
@@ -58,6 +58,10 @@ CSMI_STRUCT_MEMBER(char*   , command_arguments, STRING   ,                 , NUL
 CSMI_STRUCT_MEMBER(char**  , node_names       , ARRAY_STR, node_names_count, NULL, ) /**< Compute nodes to receive this command, size defined in @ref node_names_count.*/
 
 CSMI_VERSION_END(95abcf946e52d7205b95166cd678c6aa)
+
+CSMI_VERSION_START(CSM_VERSION_1_6_0)
+CSMI_STRUCT_MEMBER(csmi_user_info_t*,user_info, STRUCT, , NULL, csmi_user_info_t) /**< A collection of user values. CSM USE ONLY!*/
+CSMI_VERSION_END(6b66eeb4bd679d676e0d1a0893533a60)
 #undef CSMI_VERSION_START
 #undef CSMI_VERSION_END
 #undef CSMI_STRUCT_MEMBER

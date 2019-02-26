@@ -204,6 +204,26 @@ extern const char* csmi_ras_severity_t_strs [];
 /** @}*/
 
 
+/**
+ * @brief A container defining the ulimit of a resource of a user.
+ */
+typedef struct {
+    uint64_t _metadata; /** The number of fields in the struct.*/
+    int resource; /**< The ulimit Resource ID */
+    int64_t cur_limit; /**< The current ulimit*/
+    int64_t max_limit; /**< The Maximum ulimit*/
+} csmi_ulimit_t;
+/**
+ * @brief A container defining the ulimit of a resource of a user.
+ */
+typedef struct {
+    uint64_t _metadata; /** The number of fields in the struct.*/
+    char* user; /**< The user name. */
+    int32_t uid; /**< User id. */
+    int32_t gid; /**< User group ID. */
+    int32_t num_ulimits; /**< The number of ulimits captured. */
+    csmi_ulimit_t** ulimits; /**< A collection of ulimt values.*/
+} csmi_user_info_t;
 /** @} */
 
 #ifdef __cplusplus

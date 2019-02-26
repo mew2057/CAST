@@ -61,10 +61,11 @@ struct csmi_jsrun_cmd_context_t {
     char*    launch_node;
     char**   compute_nodes;
     csmi_allocation_type_t  type;
+    csmi_user_info_t* user_info;
     
     csmi_jsrun_cmd_context_t() :
         user_id(0), num_nodes(0), allocation_id(0), kv_pairs(nullptr), jsm_path(nullptr),
-        launch_node(nullptr),compute_nodes(nullptr), type(CSM_USER_MANAGED) {}
+        launch_node(nullptr),compute_nodes(nullptr), type(CSM_USER_MANAGED), user_info(nullptr) {}
 
     ~csmi_jsrun_cmd_context_t()
     {
@@ -87,7 +88,16 @@ struct csmi_jsrun_cmd_context_t {
             }
             free(compute_nodes);
         }
+
+        if ( user_info != nullptr)
+        {
+            csm_free_struct_ptr( csmi_user_info_t, user_info);
+        }
+
+        user_info     = nullptr;
         compute_nodes = nullptr;
+
+
     }
 };
 

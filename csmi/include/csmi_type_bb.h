@@ -79,6 +79,7 @@ typedef struct {
     uint32_t node_names_count; /**< Number of  nodes to issue the burst buffer command on, size of @ref node_names. */
     char* command_arguments; /**< The arguments for the command executable( [a-zA-Z -_]* ) */
     char** node_names; /**< Compute nodes to receive this command, size defined in @ref node_names_count.*/
+    csmi_user_info_t* user_info; /**< A collection of user values. CSM USE ONLY!*/
 } csm_bb_cmd_input_t;
 /**
  * @brief A wrapper for the output of @ref csm_bb_cmd.

@@ -58,10 +58,11 @@ struct csmi_bb_cmd_context_t {
     char*    command_arguments;
     char**   compute_nodes;
     std::string cmd_output;
+    csmi_user_info_t* user_info;
 
     csmi_bb_cmd_context_t() :
         user_id(0), num_nodes(0), command_arguments(nullptr), 
-        compute_nodes(nullptr), cmd_output("") { }
+        compute_nodes(nullptr), cmd_output(""), user_info(nullptr) { }
 
     ~csmi_bb_cmd_context_t()
     {
@@ -74,6 +75,12 @@ struct csmi_bb_cmd_context_t {
             free(compute_nodes);
         }
 
+        if ( user_info != nullptr)
+        {
+            csm_free_struct_ptr( csmi_user_info_t, user_info);
+        }
+
+        user_info=nullptr;
         compute_nodes = nullptr;
         command_arguments = nullptr;
     }

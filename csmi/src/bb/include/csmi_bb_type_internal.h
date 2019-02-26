@@ -28,6 +28,7 @@ typedef struct {
     uint32_t bb_cmd_int; /**< The user id on the spawn, error code on the response. */
     char* bb_cmd_str; /**< The arguments for the command executable on the spawn, execution message on the response.. */
     char* hostname; /**< The hostname of the node. */
+    csmi_user_info_t* user_info; /**< A collection of user values. CSM USE ONLY!*/
 } csmi_bb_cmd_payload_t;
  /**  @brief Serializes the supplied structure into a char buffer.
 *

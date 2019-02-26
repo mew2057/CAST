@@ -256,6 +256,45 @@ int csm_term_lib();
 int csm_enum_from_string(char *enum_str, const char *enum_strs[]); 
 
 
+/**
+ * Gathers up the ulimit values for the current user.
+ *
+ * @param[out] ulimits A collection of ulimit values.
+ *
+ * @return The size of @p ulimits.
+ */
+int32_t get_ulimits(csmi_ulimit_t** ulimits[]);
+
+/**
+ * Sets the ulimits defined by @p ulimits.
+ *
+ * @param[in] num_ulimits The size of @p ulimits.
+ * @param[in] ulimits The collection of ulimits for to set for the active session.
+ *
+ * @return 0 on success.
+ */
+int set_ulimits(  int32_t num_ulimits, csmi_ulimit_t** ulimits);
+
+/**
+ * Collects the user information for use on the compute nodes (to prevent NSS traffic).
+ *
+ * @param[out] info The aggregated user information.
+ * @return 0 on success.
+ */
+int get_user_info(csmi_user_info_t** info);
+
+/**
+ * Applies the user information against the invoking session.
+ *
+ * @param[in] info The aggregated user information.
+ *
+ * @return 0 - success 
+ *         1 - Unable to set group
+ *         2 - Unable to set supplementary groups
+ *         3 - Unable to set user id
+ *         4 - Unable to set ulimits
+ */
+int apply_user_info(csmi_user_info_t* info);
 
 #ifdef __cplusplus
 }

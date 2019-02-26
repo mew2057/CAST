@@ -117,6 +117,8 @@ bool CSMIJSRUNCMD_Master::RetrieveDataForPrivateCheck(
         input->jsm_path             = nullptr;
         mcast->kv_pairs             = input->kv_pairs;
         input->kv_pairs             = nullptr;
+        mcast->user_info            = input->user_info;
+        input->user_info            = nullptr;
 
         csm_free_struct_ptr( INPUT_STRUCT, input);
 

@@ -85,9 +85,12 @@ int csm_jsrun_cmd(
             strdup(csm_get_string_from_enum(csmi_cmd_err_t,CSMERR_INVALID_PARAM)));
         return CSMERR_INVALID_PARAM;
     }
-    
+
     // Verify that both the user and system flags have only alpha-numeric characters.
     flag_test(input->kv_pairs, "kv_flags")
+
+    // Populate the user information.
+    get_user_info( &input->user_info );
     
     // EARLY RETURN
     // Serialize the structure.

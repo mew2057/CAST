@@ -39,12 +39,14 @@ void CSMIMcast<STRUCT_TYPE,CSMIJSRUNCMDComparator>::BuildMcastPayload(char** buf
     jsrunPayload->hostname       = strdup("");
     jsrunPayload->num_nodes      = _Data->num_nodes;
     jsrunPayload->compute_nodes  = _Data->compute_nodes;
+    jsrunPayload->user_info      = _Data->user_info;
 
     csm_serialize_struct( csmi_jsrun_cmd_payload_t, jsrunPayload,
                         buffer, bufferLength );
 
     jsrunPayload->num_nodes     = 0;
     jsrunPayload->compute_nodes = nullptr;
+    jsrunPayload->user_info     = nullptr;
 
     csm_free_struct_ptr(csmi_jsrun_cmd_payload_t, jsrunPayload);
 }

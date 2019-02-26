@@ -117,6 +117,9 @@ bool CSMIBBCMD_Master::RetrieveDataForPrivateCheck(
         mcast->command_arguments    = input->command_arguments;
         mcast->compute_nodes        = input->node_names;
 
+        mcast->user_info            = input->user_info;
+        input->user_info            = nullptr;
+
         // Input struct is no longer relevant.
         input->command_arguments = nullptr;
         input->node_names        = nullptr;

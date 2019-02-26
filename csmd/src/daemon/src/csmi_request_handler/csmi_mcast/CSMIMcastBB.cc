@@ -32,12 +32,14 @@ void CSMIMcast<STRUCT_TYPE,CSMIBBCMDComparator>::BuildMcastPayload(char** buffer
 
     bbPayload->bb_cmd_str  =_Data->command_arguments;
     bbPayload->bb_cmd_int = _Data->user_id;
+    bbPayload->user_info  = _Data->user_info;
     bbPayload->hostname = strdup("");
 
     csm_serialize_struct( csmi_bb_cmd_payload_t, bbPayload,
                         buffer, bufferLength );
 
     bbPayload->bb_cmd_str = nullptr;
+    bbPayload->user_info  = nullptr;
 
     csm_free_struct_ptr(csmi_bb_cmd_payload_t, bbPayload);
 }

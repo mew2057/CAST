@@ -704,7 +704,8 @@ BOOST_PYTHON_MODULE(lib_csm_wm_py)
     class_<csm_jsrun_cmd_input_t,csm_jsrun_cmd_input_t*>("jsrun_cmd_input_t")
 		.add_property("allocation_id", &csm_jsrun_cmd_input_t::allocation_id,&csm_jsrun_cmd_input_t::allocation_id," The Allocation id for the JSM run. Exported to **CSM_ALLOCATION_ID**. ")
 		STRING_PROPERTY(csm_jsrun_cmd_input_t, char*, kv_pairs, , NULL, )
-		STRING_PROPERTY(csm_jsrun_cmd_input_t, char*, jsm_path, , NULL, );
+		STRING_PROPERTY(csm_jsrun_cmd_input_t, char*, jsm_path, , NULL, )
+		STRUCT_PROPERTY(csm_jsrun_cmd_input_t, csmi_user_info_t*, user_info, , NULL, &csm_jsrun_cmd_input_t::user_info);
 
     class_<csm_soft_failure_recovery_node_t,csm_soft_failure_recovery_node_t*>("soft_failure_recovery_node_t")
 		.add_property("errcode", &csm_soft_failure_recovery_node_t::errcode,&csm_soft_failure_recovery_node_t::errcode,"int")

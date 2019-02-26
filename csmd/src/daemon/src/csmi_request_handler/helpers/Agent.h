@@ -56,10 +56,10 @@ namespace helper {
  * @param[in] argv    The arguments to the script, array is null terminated. 
  *                      The first index is the script with its full path.
  * @param[in] output  The output of the of the forked process.
- * @param[in] user_id The user to execut the forked process as.
+ * @param[in] info    The user info to execute as.
  * @param[in] timeout_seconds A timeout in seconds, if set to zero no timeout occurs.
  */
-int ForkAndExecCapture(  char * const argv[], char** output, uid_t user_id, int timeout_seconds=0 );
+int ForkAndExecCapture(  char * const argv[], char** output, csmi_user_info_t* info, int timeout_seconds=0 );
 
 /**
  * @brief Forks the supplied argv then moves the forked pid into the supplied allocation id.
@@ -67,9 +67,9 @@ int ForkAndExecCapture(  char * const argv[], char** output, uid_t user_id, int 
  * @param[in] argv    The arguments to the script, array is null terminated. 
  *                      The first index is the script with its full path.
  * @param[in] allocation_id The allocation id of the targeted cgroup.
- * @param[in] user_id The user to execut the forked process as.
+ * @param[in] info    The user info to execute as.
  */
-int ForkAndExecAllocationCGroup(  char * const argv[], uint64_t allocation_id, uid_t user_id);
+int ForkAndExecAllocationCGroup(  char * const argv[], uint64_t allocation_id, csmi_user_info_t* info);
 
 /**
  * @brief Forks, clears the file descriptors, then executes a script.
@@ -130,11 +130,11 @@ inline int SetSMTLevelCSM( int smtLevel )
     return errCode;
 }
 
-inline int ExecuteBB( char* command_args, char ** output, uid_t user_id, int timeout)
+inline int ExecuteBB( char* command_args, char ** output, csmi_user_info_t* info, int timeout)
 {
     timeout += 10;
     char* scriptArgs[] = { (char*)CSM_BB_CMD, command_args, NULL };
-    int errCode = ForkAndExecCapture( scriptArgs, output, user_id, timeout );
+    int errCode = ForkAndExecCapture( scriptArgs, output, info, timeout );
     return errCode;
 }
 
@@ -142,11 +142,11 @@ inline int ExecuteSFRecovery( char ** output, int timeout)
 {
     timeout += 10;
     char* scriptArgs[] = { (char*)CSM_SFR_CMD, NULL };
-    int errCode = ForkAndExecCapture( scriptArgs, output, 0, timeout );
+    int errCode = ForkAndExecCapture( scriptArgs, output, NULL, timeout );
     return errCode;
 }
 
-inline int ExecuteJSRUN( char* jsm_path, int64_t allocation_id, uid_t user_id, char* kv_pairs, 
+inline int ExecuteJSRUN( char* jsm_path, int64_t allocation_id, csmi_user_info_t* info, char* kv_pairs, 
     uint32_t num_nodes, char** compute_nodes, char* launch_node, csmi_allocation_type_t  type)
 {
     // Build the nodes string.
@@ -182,7 +182,7 @@ inline int ExecuteJSRUN( char* jsm_path, int64_t allocation_id, uid_t user_id, c
          (!( ( (fileDetails.st_mode & S_IFDIR) > 0 ) ^ false) ) )
     {
         // Fork and don't wait.
-        errCode = ForkAndExecAllocationCGroup( scriptArgs, allocation_id, user_id);
+        errCode = ForkAndExecAllocationCGroup( scriptArgs, allocation_id, info);
     }
 
     return errCode;

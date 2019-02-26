@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include "csmi_common_internal.h"
 
 // ==============================================================
 // Constants

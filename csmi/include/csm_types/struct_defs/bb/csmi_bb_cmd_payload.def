@@ -41,7 +41,7 @@
     #define CSMI_ARRAY_FIXED         0
     #define CSMI_ARRAY_STR           0
     #define CSMI_ARRAY_STR_FIXED     0
-    #define CSMI_STRUCT              0
+    #define CSMI_STRUCT              1
     #define CSMI_ARRAY_STRUCT        0
     #define CSMI_ARRAY_STRUCT_FIXED  0
     #define CSMI_NONE                0
@@ -54,6 +54,10 @@ CSMI_STRUCT_MEMBER(uint32_t, bb_cmd_int, BASIC , ,    0, ) /**< The user id on t
 CSMI_STRUCT_MEMBER(char*   , bb_cmd_str, STRING, , NULL, ) /**< The arguments for the command executable on the spawn, execution message on the response.. */
 CSMI_STRUCT_MEMBER(char*   , hostname, STRING, , NULL, ) /**< The hostname of the node. */
 CSMI_VERSION_END(7dd15073629200d3e4d4d3e9616fb7fb)
+
+CSMI_VERSION_START(CSM_VERSION_1_6_0)
+CSMI_STRUCT_MEMBER(csmi_user_info_t*,user_info, STRUCT, , NULL, csmi_user_info_t) /**< A collection of user values. CSM USE ONLY!*/
+CSMI_VERSION_END(fb5ba40a355d0c20dae01b3d9a64db8a)
 #undef CSMI_VERSION_START
 #undef CSMI_VERSION_END
 #undef CSMI_STRUCT_MEMBER

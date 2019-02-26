@@ -110,7 +110,7 @@ build_files()
     echo "#include \"${o_file_types}\"" >> ${OUTPUT_DIR}/${o_file_functs}
     build_struct_defines ${OUTPUT_DEFS_FUNCTS[${index}]} >> ${OUTPUT_DIR}/${o_file_functs}
 
-    build_copyright_header "${o_file_c}" > ${CSMI_DIR}/${o_file_c}
+   # build_copyright_header "${o_file_c}" > ${CSMI_DIR}/${o_file_c}
     build_c_inc ${INCLUDE_DIR}${o_file_functs} >> ${CSMI_DIR}/${o_file_c}
     echo '#include "'${MACROS_DIR}${MACROS}'"' >> ${CSMI_DIR}/${o_file_c}
     echo '#include "'csmi/${o_file_types_int}'"' >>  ${CSMI_DIR}/${o_file_c}
@@ -127,7 +127,7 @@ build_files()
     echo '#include "'${STRUCT_HASH}'"' >> ${CSMI_DIR}/${o_file_h_int}
     
     # Initialize the interal C file.
-    build_copyright_header  ${o_file_c_int} > ${CSMI_DIR}/${o_file_c_int}
+    #build_copyright_header  ${o_file_c_int} > ${CSMI_DIR}/${o_file_c_int}
     echo '#include "'csmi/${o_file_h_int}'"' >>  ${CSMI_DIR}/${o_file_c_int}
     echo '#include "'csmi/${o_file_types_int}'"' >>  ${CSMI_DIR}/${o_file_c_int}
 
@@ -273,10 +273,10 @@ build_files()
 
     fi
     
-    if [ ${o_c_written} -eq 0 ]
-    then
-        rm -f ${CSMI_DIR}/${o_file_c}
-    fi
+    #if [ ${o_c_written} -eq 0 ]
+    #then
+    #    rm -f ${CSMI_DIR}/${o_file_c}
+    #fi
     
     echo "Completed header generation for ${doxy_long}; Failures: ${failure_count}; Missing: ${missing_count};"
 

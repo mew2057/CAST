@@ -18,10 +18,16 @@
 #include "csmi/src/common/include/csmi_common_utils.h"
 #include "csmi/src/common/include/csmi_serialization.h"
 #include "csmi/src/common/include/csmi_api_internal.h"
+#include <sys/resource.h> 
 
 #include <assert.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <pwd.h>       // For user details.
+
+#include <sys/types.h> // For user details.
+#include <unistd.h>    // For UID
+#include <grp.h>       // For setgroups
 
 extern int csmi_net_unix_Send(csm_net_msg_t *);
 extern csm_net_msg_t* csmi_net_unix_Recv(csmi_cmd_t cmd);

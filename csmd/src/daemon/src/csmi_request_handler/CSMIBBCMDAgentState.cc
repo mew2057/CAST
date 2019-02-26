@@ -74,7 +74,8 @@ bool BBCMDAgentState::HandleNetworkMessage(
     
     char* cmd_out = nullptr;
     bb_cmd->bb_cmd_int = csm::daemon::helper::ExecuteBB(
-        bb_cmd->bb_cmd_str, &cmd_out, bb_cmd->bb_cmd_int,
+        bb_cmd->bb_cmd_str, &cmd_out, 
+        bb_cmd->user_info,
         csm_get_agent_timeout(CMD_ID)/1000);
     
     // Copy the command string.

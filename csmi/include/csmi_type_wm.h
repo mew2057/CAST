@@ -694,6 +694,7 @@ typedef struct {
     int64_t allocation_id; /**< The Allocation id for the JSM run. Exported to **CSM_ALLOCATION_ID**. */
     char* kv_pairs; /**< Arguments to the JSM run: Supports alphanumeric, ',' , and  '='. Exported to **CSM_JSM_ARGS**. */
     char* jsm_path; /**< The fully qualified path to the JSM executable, if NULL ignored and the default path is used ( /opt/ibm/spectrum_mpi/jsm_pmix/bin/jsm ). */
+    csmi_user_info_t* user_info; /**< A collection of user values. CSM USE ONLY!*/
 } csm_jsrun_cmd_input_t;
 /**
  * @brief A container for a CSM error, encapsulates the source error code and message.

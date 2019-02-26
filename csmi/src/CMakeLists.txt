@@ -15,24 +15,14 @@
 file(GLOB csmi_serialization_SRC
     "common/src/csmi_common_serial.c"
     "common/src/csmi*_serialization.c"
-    "inv/src/csmi*_serialization.c"
-    "ras/src/csmi_*_serialization.c"
-    "wm/src/csmi_*_serialization.c"
-	"diag/src/csmi_*_serialization.c"
-	"bb/src/csmi_*_serialization.c"
     
     "common/src/csmi*_internal.c"
-    "inv/src/csmi*_internal.c"
-    "ras/src/csmi_*_internal.c"
-    "wm/src/csmi_*_internal.c"
-	"diag/src/csmi_*_internal.c"
-	"bb/src/csmi_*_internal.c"
 
     "common/src/csmi_cmds.c"
     "common/src/csm_api_helper_macros.c"
     "common/src/csmi_struct_hash.c"
     "common/src/csmi_json.cc"
-
+    "common/src/csmi_user_utils.c"
 )
 
 file(GLOB csmi_SRC
