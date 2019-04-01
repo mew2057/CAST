@@ -21,7 +21,11 @@ CSM jupyter extension?
 jupyter notebook --ip=0.0.0.0
 
 
+ln -s /usr/lib64/atlas/libsatlas.so /usr/lib64/atlas/libcblas.so
 pip install --upgrade --force-reinstall --no-cache-dir --no-build-isolation -r requirements.txt
 
 
 --no-cache-dir
+
+
+
