@@ -29,3 +29,29 @@ pip install --upgrade --force-reinstall --no-cache-dir --no-build-isolation -r r
 
 
 
+Spark
+=====
+
+pip install pyspark
+
+https://www.scala-lang.org/download/2.11.7.html
+yum install scala-2.11.7.rpm
+
+https://spark.apache.org/downloads.html
+
+```
+    tar xvf spark-2.4.1-bin-hadoop2.7.tgz
+    mkdir -p /usr/local/spark
+    mv spark-2.4.1-bin-hadoop2.7/* /opt/spark-2.4.1
+    ln -s /opt/spark-2.4.1 /opt/spark
+
+    # Users need to do this too.
+    echo "export SPARK_HOME=/opt/spark" >>  ~/.bashrc
+    echo "export PATH=\$PATH:\${SPARK_HOME}/bin" >> ~/.bashrc
+    echo "export PYTHONPATH=${SPARK_HOME}/python:${PYTHONPATH}" >> ~/.bashrc
+    source ~/.bashrc
+
+
+```
+
+
