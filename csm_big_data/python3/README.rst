@@ -44,11 +44,21 @@ https://spark.apache.org/downloads.html
     mkdir -p /usr/local/spark
     mv spark-2.4.1-bin-hadoop2.7/* /opt/spark-2.4.1
     ln -s /opt/spark-2.4.1 /opt/spark
+    unzip elasticsearch-hadoop-6.7.1.zip
+    mv elasticsearch-hadoop-6.7.1 /opt/spark
+    #ln -s /var/lib/elasticsearch-hadoop-6.7.1 /var/lib/elasticsearch-hadoop
 
     # Users need to do this too.
     echo "export SPARK_HOME=/opt/spark" >>  ~/.bashrc
     echo "export PATH=\$PATH:\${SPARK_HOME}/bin" >> ~/.bashrc
-    echo "export PYTHONPATH=${SPARK_HOME}/python:${PYTHONPATH}" >> ~/.bashrc
+    echo "export PYTHONPATH=\${SPARK_HOME}/python:\${PYTHONPATH}" >> ~/.bashrc
+
+    echo "export ES_HADOOP=/var/lib/elasticsearch-hadoop/dist/elasticsearch-hadoop-6.7.1.jar" >> ~/.bashrc
+    echo "export JUPYTER_PATH=\${SPARK_HOME}/python:\${ES_HADOOP}:\$JUPYTER_PATH" >> ~/.bashrc
+    echo "export PYSPARK_PYTHON=/usr/bin/python3" >> ~/.bashrc
+
+    #echo "export ES_HADOOP=/var/lib/elasticsearch-hadoop/dist/elasticsearch-hadoop-6.7.1.jar" >> ~/.bashrc
+    #echo "export PYSPARK_SUBMIT_ARGS=\"--jars \${ES_HADOOP} \${PYSPARK_SUBMIT_ARGS}\"" >> ~/.bashrc
     source ~/.bashrc
 
 
