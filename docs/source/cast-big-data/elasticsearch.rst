@@ -36,9 +36,11 @@ in `/opt/ibm/csm/bigdata/elasticsearch/`.
 
 .. code-block:: bash
 
-    sed -i ’s:#JAVA_HOME=.*:JAVA_HOME="/usr/lib/jvm/java”’ /etc/sysconfig/elasticsearch
+    sed -i 's:#JAVA_HOME=.*:JAVA_HOME="/usr/lib/jvm/java":g' /etc/sysconfig/elasticsearch
 
-3. Copy the Elasticsearch configuration files to the `/etc/elasticsearch` directory. 
+3. If upgrading run `chmod g+rwx /etc/elasticsearch`
+
+4. Copy the Elasticsearch configuration files to the `/etc/elasticsearch` directory. 
 
     It is recommended that the system administrator review these configurations at this phase.
 
@@ -46,20 +48,20 @@ in `/opt/ibm/csm/bigdata/elasticsearch/`.
     :elasticsearch.yml: Configuration of the service specific attributes, please see 
         `elasticsearch.yml`_ for details.
 
-4. Make an ext4 filesystem on each hard drive designated to be in the Elasticsearch JBOD. 
+5. Make an ext4 filesystem on each hard drive designated to be in the Elasticsearch JBOD. 
 
     The mounted names for these file systems should match the names specified in `path.data`. 
     Additionally, these mounted file systems should be owned by the ``elasticsearch`` user and 
     in the ``elasticsearch`` group.
 
-5. Start Elasticsearch:
+6. Start Elasticsearch:
 
 .. code-block:: bash
 
     systemctl enable elasticsearch
     systemctl start elasticsearch
 
-6. Run the index template creator script:
+7. Run the index template creator script:
 
 .. code-block:: bash
 
