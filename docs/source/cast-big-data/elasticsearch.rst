@@ -14,8 +14,8 @@ storage or large numbers of drives are prefered.
 Configuration
 -------------
 
-.. note:: This guide has been tested using Elasticsearch 6.3.2, the latest RPM may be downloaded from
-    `the Elastic Site <https://www.elastic.co/downloads/elasticsearch>`_.
+.. note:: This guide has been tested using Elasticsearch 7.0.0.
+
 
 The following is a brief introduction to the installation and configuration of the elasticsearch service.
 It is generally assumed that elasticsearch is to be installed on multiple Big Data Nodes to take
@@ -32,7 +32,13 @@ in `/opt/ibm/csm/bigdata/elasticsearch/`.
 
     yum install -y elasticsearch-*.rpm java-1.8.*-openjdk
 
-2. Copy the Elasticsearch configuration files to the `/etc/elasticsearch` directory. 
+2. Set the `JAVA_HOME` in the `/etc/sysconfig/elasticsearch` cofiguration file.
+
+.. code-block:: bash
+
+    sed -i ’s:#JAVA_HOME=.*:JAVA_HOME="/usr/lib/jvm/java”’ /etc/sysconfig/elasticsearch
+
+3. Copy the Elasticsearch configuration files to the `/etc/elasticsearch` directory. 
 
     It is recommended that the system administrator review these configurations at this phase.
 
@@ -40,20 +46,20 @@ in `/opt/ibm/csm/bigdata/elasticsearch/`.
     :elasticsearch.yml: Configuration of the service specific attributes, please see 
         `elasticsearch.yml`_ for details.
 
-3. Make an ext4 filesystem on each hard drive designated to be in the Elasticsearch JBOD. 
+4. Make an ext4 filesystem on each hard drive designated to be in the Elasticsearch JBOD. 
 
     The mounted names for these file systems should match the names specified in `path.data`. 
     Additionally, these mounted file systems should be owned by the ``elasticsearch`` user and 
     in the ``elasticsearch`` group.
 
-4. Start Elasticsearch:
+5. Start Elasticsearch:
 
 .. code-block:: bash
 
     systemctl enable elasticsearch
     systemctl start elasticsearch
 
-5. Run the index template creator script:
+6. Run the index template creator script:
 
 .. code-block:: bash
 
@@ -109,14 +115,18 @@ system administrator. A brief rundown of the fields to modify is as follows:
     The port to bind Elasticsearch to. 
     CAST defaults to ``9200``.
 
-:discovery.zen.ping.unicast.hosts: 
-    A list of nodes likely to be active, comma delimited array.
-    CAST defaults to ``cast.elasticsearch.nodes``.
+:discovery.seed_hosts: 
+    Replaces `discovery.zen.ping.unicast.hosts`.
+    A list of nodes that are master-eligible.
+    Consult `Discovery-Settings`_ for more details.
 
-:discovery.zen.minimum_master_nodes: 
-    Number of nodes with the ``node.master`` setting set to true that must be connected to 
-    before starting. 
-    Elastic search recommends ``(master_eligible_nodes/2)+1``.
+    .. warning:: This must be added  if upgrading from `6.x` to `7.x`!
+
+:cluster.initial_master_nodes:
+    Used in cluster discovery to specify possible master nodes.
+    Consult `Discovery-Settings`_ for more details.
+
+    .. warning:: This must be added  if upgrading from `6.x` to `7.x`!
 
 :gateway.recover_after_nodes: 
     Number of nodes to wait for before begining recovery after cluster-wide restart.
@@ -619,4 +629,5 @@ While not managed by CAST crassd will ship bmc alerts to the big data store.
 .. _Elasticsearch: https://www.elastic.co/products/elasticsearch
 .. _Configuring Elasticsearch: https://www.elastic.co/guide/en/elasticsearch/reference/current/settings.html
 .. _xCat-GoConserver: http://xcat-docs.readthedocs.io/en/stable/advanced/goconserver/
+.. _Discovery-Settings: https://www.elastic.co/guide/en/elasticsearch/reference/7.0/discovery-settings.html
 

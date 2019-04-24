@@ -1,0 +1,32 @@
+.. _CAST1.6.X:
+
+Release 1.6.0
+=============
+
+:GitHub Tag:
+
+
+CSM APIs
+########
+
+
+
+
+CSM BDS
+#######
+
+* Added documentation for Elasticsearch 7.0.0 configuration.
+
+CSM Daemon
+##########
+
+
+CSM Database
+############
+
+
+RPMS
+####
+
+
+

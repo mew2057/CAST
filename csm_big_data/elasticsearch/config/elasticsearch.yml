@@ -4,8 +4,8 @@ path.data: DATA-PATH
 path.logs: LOG-DIR
 network.host: BIND-ADDRESS
 http.port: 9200
-discovery.zen.ping.unicast.hosts: cast.elasticsearch.nodes
-discovery.zen.minimum_master_nodes: MIN-NODES
+discovery.seed_hosts: [ SEED_HOSTS ]
+cluster.initial_master_nodes: [ SEED_HOSTS ]
 gateway.recover_after_nodes: REC-NODES
 xpack.ml.enabled: false
 xpack.license.self_generated.type: basic
