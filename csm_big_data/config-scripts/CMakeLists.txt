@@ -20,6 +20,7 @@ set(CONFDIR data-aggregators/config)
 # Files that should be executable when shipped
 file(GLOB INSTALL_PROGRAMS
     "modifyConfig.py"
+    "logstashFixupScript.sh"
 )
 
 install(PROGRAMS ${INSTALL_PROGRAMS} COMPONENT ${BDS_RPM_NAME} DESTINATION ${BDS_BASE_NAME}/${SUBDIR})

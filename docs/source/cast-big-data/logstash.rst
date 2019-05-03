@@ -2,6 +2,8 @@
 
 Logstash
 ========
+.. warning:: Logstash 7.0.0 is *BROKEN* on ppc64le due to JRuby errors. Execute the `logstashFixupScript.sh`
+    to patch your logstash instance.
 
 `Logstash`_ is an open-source data processing pipeline used in the E\ **L**\ K stack. The core function
 of this service is to process unstructured data, typically syslogs, and then pass the newly structured
