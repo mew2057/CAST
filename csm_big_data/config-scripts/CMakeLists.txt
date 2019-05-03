@@ -21,6 +21,7 @@ set(CONFDIR data-aggregators/config)
 file(GLOB INSTALL_PROGRAMS
     "modifyConfig.py"
     "logstashFixupScript.sh"
+    "elasticBuildFixup.sh"
 )
 
 install(PROGRAMS ${INSTALL_PROGRAMS} COMPONENT ${BDS_RPM_NAME} DESTINATION ${BDS_BASE_NAME}/${SUBDIR})
