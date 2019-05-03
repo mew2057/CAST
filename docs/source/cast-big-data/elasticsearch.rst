@@ -16,6 +16,8 @@ Configuration
 
 .. note:: This guide has been tested using Elasticsearch 7.0.0.
 
+.. warning:: If upgrading from 1.6.1 to 7.0.0 upgrade elasticsearch to 6.7.0 before upgrading to 7.0.0.
+
 
 The following is a brief introduction to the installation and configuration of the elasticsearch service.
 It is generally assumed that elasticsearch is to be installed on multiple Big Data Nodes to take

@@ -33,7 +33,7 @@ CAST recommends the following four values be set before starting Kibana:
 | server.host            | The address the kibana server will bind on, needed for      | "10.7.4.30"             |
 |                        | external access.                                            |                         |
 +------------------------+-------------------------------------------------------------+-------------------------+
-| elasticsearch.url      | The URL of an elasticsearch service, this should include    | "http://10.7.4.13:9200" |
+| elasticsearch.hosts      | The URL of an elasticsearch service, this should include    | "http://10.7.4.13:9200" |
 |                        | the port number (9200 by default).                          |                         |
 +------------------------+-------------------------------------------------------------+-------------------------+
 | xpack.security.enabled | The xpack security setting, set to false if not being used. | false                   |
@@ -41,6 +41,9 @@ CAST recommends the following four values be set before starting Kibana:
 | xpack.ml.enabled       | Sets the status of xpack Machine Learning. Please note      | false                   |
 |                        | this must be set to false on ppc64le installations.         |                         |
 +------------------------+-------------------------------------------------------------+-------------------------+
+
+.. warning:: `elasticsearch.url` was renamed to `elasticsearch.hosts` in 7.0.0.
+
 
 3. Install the `CAST Search`_ rpm:
 
