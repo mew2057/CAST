@@ -3,22 +3,5 @@
     "order" : 1,
     "aliases" : {
         "cast-log-mellanox-event" : {}
-    },
-    "mappings": {
-        "_doc" : {
-            "properties" :
-            {
-                "hostname"     : { "type" : "text" },
-                "program_name" : { "type" : "text" },
-                "process_id"   : { "type" : "text" },
-                "facility"     : { "type" : "text" },
-                "severity"     : { "type" : "text" },
-                "message"      : { "type" : "text" },
-                "log_counter"  : { "type" : "long" },
-                "event_id"     : { "type" : "long" },
-                "event_type"   : { "type" : "text" },
-                "category"     : { "type" : "text" }
-            }
-        }
     }
 }

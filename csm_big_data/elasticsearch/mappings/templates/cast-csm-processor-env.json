@@ -5,29 +5,7 @@
         "cast-csm-processor-env" : {}
     },
     "mappings": {
-        "_doc" : {
-	        "dynamic_date_formats" : 
-		        [ "strict_date_optional_time","yyyy/MM/dd HH:mm:ss Z||yyyy/MM/dd Z||yyyy-MM-dd HH:mm:ss.SSSSSS"],
-            "properties" : {
-                "@version"   : { "type" : "text" },
-                "@timestamp" : { "type" : "date" },
-                "timestamp"  : { "type" : "date",  "format" : "yyyy-MM-dd HH:mm:ss.SSSSSS" },
-                "tags"       : { "type" : "text" },
-                "type"       : { "type" : "text" },
-                "source"     : { "type" : "text" },
-                "data": {
-		            "type" : "nested",
-                    "properties" : {
-                        "gpu_energy"        : { "type": "long"},
-                        "memory_energy"     : { "type": "long"},
-                        "processor_energy"  : { "type": "long"},
-                        "processor_id"      : { "type": "long"},
-                        "processor_temp"    : { "type": "long"},
-                        "processor_temp_max": { "type": "long"},
-                        "processor_temp_min": { "type": "long"}
-                    }
-                }
-            }
-        }
+	"dynamic_date_formats" : 
+		[ "strict_date_optional_time","yyyy/MM/dd HH:mm:ss Z||yyyy/MM/dd Z||yyyy-MM-dd HH:mm:ss.SSSSSS||yyyy-MM-dd HH:mm:ss"]
     }
 }

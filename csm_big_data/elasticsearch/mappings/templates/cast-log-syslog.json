@@ -3,22 +3,5 @@
     "order" : 1,
     "aliases" : {
         "cast-log-syslog" : {}
-    },
-    "mappings": {
-        "_doc" : {
-            "properties" : {
-                "@version"   : { "type" : "text" },
-                "@timestamp" : { "type" : "date" },
-                "tags"       : { "type" : "text" },
-                "type"       : { "type" : "text" } ,
-                "host"         : { "type" : "text" },
-                "hostname"     : { "type" : "text" },
-                "program_name" : { "type" : "text" },
-                "process_id"   : { "type" : "text" },
-                "facility"     : { "type" : "text" },
-                "severity"     : { "type" : "text" },
-                "message"      : { "type" : "text" }
-            }
-        }
     }
 }

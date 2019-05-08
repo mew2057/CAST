@@ -5,29 +5,7 @@
         "cast-csm-gpu-env" : {}
     },
     "mappings": {
-        "_doc" : {
-	        "dynamic_date_formats" : 
-		        [ "strict_date_optional_time","yyyy/MM/dd HH:mm:ss Z||yyyy/MM/dd Z||yyyy-MM-dd HH:mm:ss.SSSSSS"],
-            "properties" : {
-                "@version"   : { "type" : "text" },
-                "@timestamp" : { "type" : "date" },
-                "timestamp"  : { "type" : "date", "format" : "yyyy-MM-dd HH:mm:ss.SSSSSS" },
-                "tags"       : { "type" : "text" },
-                "type"       : { "type" : "text" },
-                "source"     : { "type" : "text" },
-                "data": {
-		            "type" : "nested",
-                    "properties" : {
-                        "gpu_id"           : {"type": "long"},
-                        "gpu_mem_temp"     : {"type": "long"},
-                        "gpu_mem_temp_max" : {"type": "long"},
-                        "gpu_mem_temp_min" : {"type": "long"},
-                        "gpu_temp"         : {"type": "long"},
-                        "gpu_temp_max"     : {"type": "long"},
-                        "gpu_temp_min"     : {"type": "long"}
-                    }
-                }
-            }
-        }
+	"dynamic_date_formats" : 
+		[ "strict_date_optional_time","yyyy/MM/dd HH:mm:ss Z||yyyy/MM/dd Z||yyyy-MM-dd HH:mm:ss.SSSSSS||yyyy-MM-dd HH:mm:ss"]
     }
 }
