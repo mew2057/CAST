@@ -223,6 +223,6 @@ documentation is an abridged version.
 .. _Tuning Logstash: https://www.elastic.co/guide/en/logstash/current/tuning-logstash.html
 .. _configuration file structure: https://www.elastic.co/guide/en/logstash/current/configuration-file-structure.html
 .. _elasticsearch plugin: https://www.elastic.co/guide/en/logstash/current/plugins-outputs-elasticsearch.html
-.. _CSM Event Correlator plugin: https://github.com/IBM/CAST/blob/master/csm_big_data/Logstash/plugins/csm_event_correlator/doc/index.asciidoc
+.. _CSM Event Correlator plugin: https://github.com/IBM/CAST/blob/2b61864c1dbf7fb2f420b0f1cea0a3b6a50cfbbe/csm_big_data/logstash/plugins/csm_event_correlator/doc/index.asciidoc
 .. _Logstash settings file: https://www.elastic.co/guide/en/logstash/current/logstash-settings-file.html
 .. _filebeats: https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-getting-started.html
