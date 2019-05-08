@@ -189,7 +189,7 @@ GROUP BY {0}, {1}
                     "uid"       : "{0}-{1}".format(data["allocation_id"],data["step_id"]),
                     "data"      : data
                 }
-                file.write('{0}\n'.format(json.dumps(data_wrapped, default=str)))
+                file.write(bytes('{0}\n'.format(json.dumps(data_wrapped, default=str))).decode('utf-8','ignore'))
 
     
     except Exception as e:
