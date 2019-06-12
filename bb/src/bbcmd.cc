@@ -462,7 +462,7 @@ int bbcmd_gethandle(po::variables_map& vm)
 {
     int rc=0;
 
-    uint64_t l_TransferHandle = 0;
+    uint64_t l_TransferHandle = UNDEFINED_HANDLE;
     uint64_t l_NumContribs = 0;
     uint32_t* l_Contrib = 0;
 
@@ -1238,7 +1238,7 @@ int main(int orig_argc, const char** orig_argv)
         if (rc)
         {
             // NOTE:  bberror (error.text) was already written to...
-            LOG_RC_AND_BAIL(rc);
+            SET_RC_AND_BAIL(rc);
         }
 
         rc = setupNodeController("bb.cmd");

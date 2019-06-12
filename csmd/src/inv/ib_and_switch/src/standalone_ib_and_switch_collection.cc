@@ -29,6 +29,8 @@
 #include "csmutil/include/csmutil_logging.h"
 // Command line macros for ease of use.
 #include "csmi/src/common/include/csmi_internal_macros.h"
+// include to convert Mellanox guid to use CSM standardized guid format
+#include "../../include/inv_ib_guid.h"
 
 /////////////////////////////////////////////////////////
 #include "../include/inv_ib_connector_access.h"
@@ -724,8 +726,14 @@ int main(int argc, char *argv[])
 																							IBinput->inventory[i]->discovery_time  = strdup("NULL");
 																							IBinput->inventory[i]->collection_time = strdup("NULL");
 																							IBinput->inventory[i]->comment         = strdup("comment");
-            temp_string = INV_IB_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(7,i); 	IBinput->inventory[i]->guid_s1         = strdup(temp_string.c_str());
-            temp_string = INV_IB_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(11,i); 	IBinput->inventory[i]->guid_s2         = strdup(temp_string.c_str());
+			// Convert Mellanox guid to use CSM standardized guid format
+            temp_string = INV_IB_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(7,i); 
+            temp_string = standardizeGuid(temp_string);
+            IBinput->inventory[i]->guid_s1         = strdup(temp_string.c_str());
+            temp_string = INV_IB_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(11,i); 	
+            temp_string = standardizeGuid(temp_string);
+            IBinput->inventory[i]->guid_s2         = strdup(temp_string.c_str());
+
 			temp_string = INV_IB_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(3,i); 	IBinput->inventory[i]->identifier      = strdup(temp_string.c_str());																				
             temp_string = INV_IB_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(1,i); 	IBinput->inventory[i]->length          = strdup(temp_string.c_str());
 			temp_string = INV_IB_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(12,i); 	IBinput->inventory[i]->name            = strdup(temp_string.c_str());
@@ -785,6 +793,9 @@ int main(int argc, char *argv[])
         csm_api_object_destroy(csm_obj);
 
 	}
+
+	
+
 	
     // checking on the total number of SWITCH records
     if ( totalSwitchRecords > 0 )
@@ -797,6 +808,13 @@ int main(int argc, char *argv[])
 		csm_init_struct_ptr(csm_switch_inventory_collection_input_t, SWITCHinput);
 		csm_switch_inventory_collection_output_t* SWITCHoutput = NULL;
 		*/
+
+		//rolling inventory counter
+		// number of modules may not be the same on each switch.
+        // used to later adjust/offset a search index accordingly 
+        // probably a better solution.
+        // use this for now until we switch over to json reader tree.
+		uint32_t rolling_total_module_counter = 0;
 
 		// number of records to insert.
 		SWITCHinput->inventory_count = totalSwitchRecords;
@@ -826,7 +844,11 @@ int main(int argc, char *argv[])
                                                                                               SWITCHinput->inventory[i]->switch_data->comment                 = strdup("N/A");
             temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(1,i);  SWITCHinput->inventory[i]->switch_data->description             = strdup(temp_string.c_str());																								 
             temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(2,i);  SWITCHinput->inventory[i]->switch_data->fw_version              = strdup(temp_string.c_str());
-            temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(3,i);  SWITCHinput->inventory[i]->switch_data->gu_id                   = strdup(temp_string.c_str());
+
+            // Convert Mellanox guid to use CSM standardized guid format
+            temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(3,i); 
+            temp_string = standardizeGuid(temp_string); 
+            SWITCHinput->inventory[i]->switch_data->gu_id = strdup(temp_string.c_str());
 			
 			temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(4,i); 
 			if(strcmp(temp_string.c_str(),"true") == 0)
@@ -867,6 +889,7 @@ int main(int argc, char *argv[])
 			else
 			{
 				SWITCHinput->inventory[i]->inventory_count = SWITCHinput->inventory[i]->switch_data->num_modules;
+				
 			}
 			
 			
@@ -878,16 +901,20 @@ int main(int argc, char *argv[])
 				bool isSystem = false;
 				//malloc space for switch inventory record
 				csm_init_struct_ptr(csmi_switch_inventory_record_t, SWITCHinput->inventory[i]->inventory[j]);
+
+                // number of modules may not be the same on each switch.
+                // adjust search index accordingly 
+				unsigned long int adjusted_index = rolling_total_module_counter + j;
 				
 				// individual module fields  
-				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("status", j);          SWITCHinput->inventory[i]->inventory[j]->status           = strdup(temp_string.c_str());
-				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("hw_version", j);      SWITCHinput->inventory[i]->inventory[j]->hw_version       = strdup(temp_string.c_str());
-				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("name", j);            SWITCHinput->inventory[i]->inventory[j]->name             = strdup(temp_string.c_str());
-				                                                                                                         SWITCHinput->inventory[i]->inventory[j]->host_system_guid = strdup(SWITCHinput->inventory[i]->switch_data->switch_name);
+				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("status", adjusted_index);          SWITCHinput->inventory[i]->inventory[j]->status           = strdup(temp_string.c_str());
+				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("hw_version", adjusted_index);      SWITCHinput->inventory[i]->inventory[j]->hw_version       = strdup(temp_string.c_str());
+				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("name", adjusted_index);            SWITCHinput->inventory[i]->inventory[j]->name             = strdup(temp_string.c_str());
+				                                                                                                                      SWITCHinput->inventory[i]->inventory[j]->host_system_guid = strdup(SWITCHinput->inventory[i]->switch_data->gu_id);
 				
-				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("number_of_chips", j); SWITCHinput->inventory[i]->inventory[j]->number_of_chips  = std::strtol(temp_string.c_str(), &pEnd, 10); if(pEnd == temp_string.c_str()) SWITCHinput->inventory[i]->inventory[j]->number_of_chips  = -1.0;
+				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("number_of_chips", adjusted_index); SWITCHinput->inventory[i]->inventory[j]->number_of_chips  = std::strtol(temp_string.c_str(), &pEnd, 10); if(pEnd == temp_string.c_str()) SWITCHinput->inventory[i]->inventory[j]->number_of_chips  = -1.0;
 
-				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("description", j);     SWITCHinput->inventory[i]->inventory[j]->description      = strdup(temp_string.c_str()); 
+				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("description", adjusted_index);     SWITCHinput->inventory[i]->inventory[j]->description      = strdup(temp_string.c_str()); 
 				
 				//check for special "system" which is a UFM hack to give us main serial number
 				if(strcmp(SWITCHinput->inventory[i]->inventory[j]->description, "system") == 0 || strcmp(SWITCHinput->inventory[i]->inventory[j]->description, "SYSTEM") == 0)
@@ -895,12 +922,12 @@ int main(int argc, char *argv[])
 					isSystem = true;
 				}
 
-				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("max_ib_ports", j);    SWITCHinput->inventory[i]->inventory[j]->max_ib_ports     = std::strtol(temp_string.c_str(), &pEnd, 10); if(pEnd == temp_string.c_str()) SWITCHinput->inventory[i]->inventory[j]->max_ib_ports  = -1.0; 
+				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("max_ib_ports", adjusted_index);    SWITCHinput->inventory[i]->inventory[j]->max_ib_ports     = std::strtol(temp_string.c_str(), &pEnd, 10); if(pEnd == temp_string.c_str()) SWITCHinput->inventory[i]->inventory[j]->max_ib_ports  = -1.0; 
 				//fw version , can go here
-				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("module_index", j);    SWITCHinput->inventory[i]->inventory[j]->module_index     = std::strtol(temp_string.c_str(), &pEnd, 10); if(pEnd == temp_string.c_str()) SWITCHinput->inventory[i]->inventory[j]->module_index  = -1.0;
+				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("module_index", adjusted_index);    SWITCHinput->inventory[i]->inventory[j]->module_index     = std::strtol(temp_string.c_str(), &pEnd, 10); if(pEnd == temp_string.c_str()) SWITCHinput->inventory[i]->inventory[j]->module_index  = -1.0;
 				//temperature we aren't gathering.
-				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("device_type", j);     SWITCHinput->inventory[i]->inventory[j]->device_type      = strdup(temp_string.c_str());
-				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("serial_number", j);   SWITCHinput->inventory[i]->inventory[j]->serial_number    = strdup(temp_string.c_str());  
+				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("device_type", adjusted_index);     SWITCHinput->inventory[i]->inventory[j]->device_type      = strdup(temp_string.c_str());
+				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("serial_number", adjusted_index);   SWITCHinput->inventory[i]->inventory[j]->serial_number    = strdup(temp_string.c_str());  
 				//if this is the system module then copy the serial number back to the main switch record. 
 				//For now, we decided to keep this "hack" module in the CSM database.
 				//maybe in the future, we may decided to not record the "system" module
@@ -912,13 +939,15 @@ int main(int argc, char *argv[])
 					}
 					SWITCHinput->inventory[i]->switch_data->serial_number = strdup(SWITCHinput->inventory[i]->inventory[j]->serial_number); 
 				}
-				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("path", j);             SWITCHinput->inventory[i]->inventory[j]->path             = strdup(temp_string.c_str()); 
-				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("device_name", j);      SWITCHinput->inventory[i]->inventory[j]->device_name      = strdup(temp_string.c_str());
+				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("path", adjusted_index);             SWITCHinput->inventory[i]->inventory[j]->path             = strdup(temp_string.c_str()); 
+				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("device_name", adjusted_index);      SWITCHinput->inventory[i]->inventory[j]->device_name      = strdup(temp_string.c_str());
 				//type field
-				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("severity", j);         SWITCHinput->inventory[i]->inventory[j]->severity         = strdup(temp_string.c_str());
+				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("severity", adjusted_index);         SWITCHinput->inventory[i]->inventory[j]->severity         = strdup(temp_string.c_str());
 				                                                                                                          SWITCHinput->inventory[i]->inventory[j]->discovery_time   = strdup(strdup("N/A"));                                      
 				                                                                                                          SWITCHinput->inventory[i]->inventory[j]->collection_time  = strdup(strdup("N/A"));                                      
-				                                                                                                          SWITCHinput->inventory[i]->inventory[j]->comment          = strdup(strdup("N/A"));                                    
+				                                                                                                          SWITCHinput->inventory[i]->inventory[j]->comment          = strdup(strdup("N/A"));   
+				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("type", adjusted_index);             SWITCHinput->inventory[i]->inventory[j]->type             = strdup(temp_string.c_str()); 
+				temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue_module("fw_version", adjusted_index);       SWITCHinput->inventory[i]->inventory[j]->fw_version       = strdup(temp_string.c_str());                               
 			}
 			//resume base switch information
 			                                                                                 
@@ -930,12 +959,23 @@ int main(int argc, char *argv[])
 			temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(14,i); SWITCHinput->inventory[i]->switch_data->sm_mode                 = strdup(temp_string.c_str());
 			temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(15,i); SWITCHinput->inventory[i]->switch_data->state                   = strdup(temp_string.c_str());
 			temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(16,i); SWITCHinput->inventory[i]->switch_data->sw_version              = strdup(temp_string.c_str());
-			temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(17,i); SWITCHinput->inventory[i]->switch_data->system_guid             = strdup(temp_string.c_str());
+
+			// Convert Mellanox guid to use CSM standardized guid format
+			temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(17,i); 
+			temp_string = standardizeGuid(temp_string);
+			SWITCHinput->inventory[i]->switch_data->system_guid = strdup(temp_string.c_str());
+
 			temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(18,i); SWITCHinput->inventory[i]->switch_data->system_name             = strdup(temp_string.c_str());
 			temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(19,i); SWITCHinput->inventory[i]->switch_data->total_alarms            = std::strtol(temp_string.c_str(), &pEnd, 10); if(pEnd == temp_string.c_str()) SWITCHinput->inventory[i]->switch_data->total_alarms  = -1.0; 
 			temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(20,i); SWITCHinput->inventory[i]->switch_data->type                    = strdup(temp_string.c_str());
             temp_string = INV_SWITCH_CONNECTOR_ACCESS::GetInstance()->ReturnFieldValue(21,i); SWITCHinput->inventory[i]->switch_data->vendor                  = strdup(temp_string.c_str());
 
+
+            // temp fix? 
+			// after this inventory has been constructed
+			// keep track of where we are in the total module list.
+			// oh god this is awful
+			rolling_total_module_counter = rolling_total_module_counter + SWITCHinput->inventory[i]->inventory_count;
 		}
 
 		// Call the CSM API

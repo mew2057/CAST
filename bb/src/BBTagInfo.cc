@@ -117,7 +117,7 @@ BBTagInfo::BBTagInfo(BBTagInfoMap* pTagInfo, const uint64_t pNumContrib, const u
     for (size_t i=0; i<(size_t)pNumContrib; ++i) {
         expectContrib.push_back(pContrib[i]);
     }
-    uint64_t l_Handle = 0;
+    uint64_t l_Handle = UNDEFINED_HANDLE;
     getTransferHandle(l_Handle, pTagInfo, pJob, pTag, pGeneratedHandle);
     setTransferHandle(l_Handle);
 
@@ -141,6 +141,9 @@ int BBTagInfo::addTransferDef(const std::string& pConnectionName, const LVKey* p
 
     HandleFile* l_HandleFile = 0;
     char* l_HandleFileName = 0;
+
+    lockLocalMetadata(pLVKey, "BBTagInfo::addTransferDef");
+    int l_LocalMetadataLocked = 1;
 
     // NOTE: The handle file is locked exclusive here to serialize amongst multiple bbServers
     //       adding transfer definitions...
@@ -184,7 +187,7 @@ int BBTagInfo::addTransferDef(const std::string& pConnectionName, const LVKey* p
                 {
                     // NOTE:  The following checks are required here in case the transfer definition just added
                     //        had no files but completed the criteria being checked...
-                    if ((expectContrib.size() == getNumberOfTransferDefs()) && (!parts.anyStoppedTransferDefinitions()))
+                    if ((expectContrib.size() == getNumberOfTransferDefs()) && (!parts.anyStoppedTransferDefinitions(this)))
                     {
                         setAllContribsReported(pLVKey, pJob.getJobId(), pJob.getJobStepId(), pHandle);
                     }
@@ -194,7 +197,7 @@ int BBTagInfo::addTransferDef(const std::string& pConnectionName, const LVKey* p
 
                         int l_NewStatus = 0;
                         Extent l_Extent = Extent();
-                        ExtentInfo l_ExtentInfo = ExtentInfo(pHandle, pContribId, &l_Extent, pTransferDef);
+                        ExtentInfo l_ExtentInfo = ExtentInfo(pHandle, pContribId, &l_Extent, this, pTransferDef);
                         pLV_Info->updateTransferStatus(pLVKey, l_ExtentInfo, pTagId, pContribId, l_NewStatus, 0);
                         if (l_NewStatus)
                         {
@@ -229,6 +232,12 @@ int BBTagInfo::addTransferDef(const std::string& pConnectionName, const LVKey* p
         rc = -1;
         errorText << "BBTagInfo::addTransferDef: Handle file could not be loaded for " << *pLVKey << ", handle " << pHandle << ", contribid " << pContribId;
         LOG_ERROR(errorText);
+    }
+
+    if (l_LocalMetadataLocked)
+    {
+        l_LocalMetadataLocked = 0;
+        unlockLocalMetadata(pLVKey, "BBTagInfo::addTransferDef - Exit");
     }
 
     if (l_HandleFileName)
@@ -266,7 +275,7 @@ void BBTagInfo::bumpTransferHandle(uint64_t& pHandle) {
 
 void BBTagInfo::calcCanceled(const LVKey* pLVKey, const uint64_t pJobId, const uint64_t pJobStepId, const uint64_t pHandle)
 {
-    int l_CanceledTransferDefinitions = parts.anyCanceledTransferDefinitions();
+    int l_CanceledTransferDefinitions = parts.anyCanceledTransferDefinitions(this);
     if (canceled() != l_CanceledTransferDefinitions)
     {
         setCanceledForHandle(pLVKey, pJobId, pJobStepId, pHandle, UNDEFINED_CONTRIBID, l_CanceledTransferDefinitions);
@@ -276,7 +285,7 @@ void BBTagInfo::calcCanceled(const LVKey* pLVKey, const uint64_t pJobId, const u
 
 void BBTagInfo::calcStopped(const LVKey* pLVKey, const uint64_t pJobId, const uint64_t pJobStepId, const uint64_t pHandle)
 {
-    int l_StoppedTransferDefinitions = parts.anyStoppedTransferDefinitions();
+    int l_StoppedTransferDefinitions = parts.anyStoppedTransferDefinitions(this);
     if (stopped() != l_StoppedTransferDefinitions)
     {
         setStopped(pLVKey, pJobId, pJobStepId, pHandle, UNDEFINED_CONTRIBID, l_StoppedTransferDefinitions);
@@ -319,7 +328,7 @@ void BBTagInfo::expectContribToSS(stringstream& pSS) const {
 
 uint64_t BBTagInfo::get_xbbServerHandle(const BBJob& pJob, const uint64_t pTag)
 {
-    uint64_t l_Handle = 0;
+    uint64_t l_Handle = UNDEFINED_HANDLE;
     uint32_t* l_ContribArray = 0;
     HandleFile* l_HandleFile = 0;
     uint64_t l_NumOfContribsInArray = 0;
@@ -346,7 +355,7 @@ uint64_t BBTagInfo::get_xbbServerHandle(const BBJob& pJob, const uint64_t pTag)
 
                     if (!compareContrib(l_NumOfContribsInArray, l_ContribArray))
                     {
-                        l_Handle = stoul(handle.path().filename().string());
+                        l_Handle = stoull(handle.path().filename().string());
                     }
                     else
                     {
@@ -417,7 +426,7 @@ BBSTATUS BBTagInfo::getStatus(const int pStageOutStarted) {
 }
 
 void BBTagInfo::getTransferHandle(uint64_t& pHandle, BBTagInfoMap* pTagInfo, const BBJob pJob, const uint64_t pTag, int& pGeneratedHandle) {
-    pGeneratedHandle = 0;
+    pGeneratedHandle = UNDEFINED_HANDLE;
     pHandle = get_xbbServerHandle(pJob, pTag);
     if (!pHandle) {
         pGeneratedHandle = 1;
@@ -453,7 +462,7 @@ int BBTagInfo::prepareForRestart(const std::string& pConnectionName, const LVKey
 
     if (pPass == FIRST_PASS)
     {
-        int l_Attempts = 2;
+        int l_Attempts = 1;
         bool l_AllDone = false;
         while (!l_AllDone)
         {
@@ -462,7 +471,8 @@ int BBTagInfo::prepareForRestart(const std::string& pConnectionName, const LVKey
             // Make sure that the HandleFile indicates that the handle has at least
             // one transfer definition that is stopped
             rc = 1;
-            uint64_t l_Continue = wrkqmgr.getDeclareServerDeadCount();
+            uint64_t l_OriginalDeclareServerDeadCount = wrkqmgr.getDeclareServerDeadCount(pJob, pHandle, pContribId);
+            uint64_t l_Continue = l_OriginalDeclareServerDeadCount;
             while ((rc == 1) && (l_Continue--))
             {
                 BBSTATUS l_Status;
@@ -487,23 +497,26 @@ int BBTagInfo::prepareForRestart(const std::string& pConnectionName, const LVKey
                                  << ", handle " << pHandle << ". Cannot restart any transfer definitions under this handle.";
                 }
 
-                if (rc && l_Continue)
+                if (rc)
                 {
-                    if (((wrkqmgr.getDeclareServerDeadCount() - l_Continue) % 15) == 1)
+                    if (l_Continue)
                     {
-                        // Display this message every 15 seconds...
-                        FL_Write6(FLDelay, PrepareForRestart, "Attempting to restart a transfer definition for jobid %ld, jobstepid %ld, handle %ld, contribid %ld. Delay of 1 second before retry. %ld seconds remain waiting for the original bbServer to act before an unconditional stop is performed.",
-                                  (uint64_t)pJob.getJobId(), (uint64_t)pJob.getJobStepId(), (uint64_t)pHandle, (uint64_t)pContribId, (uint64_t)l_Continue, 0);
-                        LOG(bb,info) << ">>>>> DELAY <<<<< BBTagInfo::prepareForRestart: Attempting to restart a transfer definition for jobid " << pJob.getJobId() \
-                                     << ", jobstepid " << pJob.getJobStepId() << ", handle " << pHandle << ", contribid " << pContribId \
-                                     << ". Waiting for the handle to be marked as stopped. Delay of 1 second before retry. " << l_Continue \
-                                     << " seconds remain waiting for the original bbServer to act before an unconditional stop is performed.";
+                        if (((l_OriginalDeclareServerDeadCount - l_Continue) % 15) == 5)
+                        {
+                            // Display this message every 15 seconds, after an initial wait of 5 seconds...
+                            FL_Write6(FLDelay, PrepareForRestart, "Attempting to restart a transfer definition for jobid %ld, jobstepid %ld, handle %ld, contribid %ld. Delay of 1 second before retry. %ld seconds remain waiting for the original bbServer to act before an unconditional stop is performed.",
+                                      (uint64_t)pJob.getJobId(), (uint64_t)pJob.getJobStepId(), (uint64_t)pHandle, (uint64_t)pContribId, (uint64_t)l_Continue, 0);
+                            LOG(bb,info) << ">>>>> DELAY <<<<< BBTagInfo::prepareForRestart: Attempting to restart a transfer definition for jobid " << pJob.getJobId() \
+                                         << ", jobstepid " << pJob.getJobStepId() << ", handle " << pHandle << ", contribid " << pContribId \
+                                         << ". Waiting for the handle to be marked as stopped. Delay of 1 second before retry. " << l_Continue \
+                                         << " seconds remain waiting for the original bbServer to act before an unconditional stop is performed.";
+                        }
+                        unlockLocalMetadata(pLVKey, "BBTagInfo::prepareForRestart - Waiting for transfer definition to be marked as stopped");
+                        {
+                            usleep((useconds_t)1000000);    // Delay 1 second
+                        }
+                        lockLocalMetadata(pLVKey, "BBTagInfo::prepareForRestart - Waiting for transfer definition to be marked as stopped");
                     }
-                    unlockTransferQueue(pLVKey, "BBTagInfo::prepareForRestart - Waiting for transfer definition to be marked as stopped");
-                    {
-                        usleep((useconds_t)1000000);    // Delay 1 second
-                    }
-                    lockTransferQueue(pLVKey, "BBTagInfo::prepareForRestart - Waiting for transfer definition to be marked as stopped");
 
                     // Check to make sure the job still exists after releasing/re-acquiring the lock
                     if (!jobStillExists(pConnectionName, pLVKey, (BBLV_Info*)0, this, pJob.getJobId(), pContribId))
@@ -516,7 +529,7 @@ int BBTagInfo::prepareForRestart(const std::string& pConnectionName, const LVKey
 
             if (rc > 0)
             {
-                if (--l_Attempts)
+                if (l_Attempts--)
                 {
                     rc = prepareForRestartOriginalServerDead(pConnectionName, pLVKey, pHandle, pJob, pContribId);
                     switch (rc)
@@ -725,7 +738,7 @@ void BBTagInfo::setStopped(const LVKey* pLVKey, const uint64_t pJobId, const uin
     return;
 }
 
-int BBTagInfo::stopTransfer(const LVKey* pLVKey, BBLV_Info* pLV_Info, const string& pHostName, const uint64_t pJobId, const uint64_t pJobStepId, const uint64_t pHandle, const uint32_t pContribId, TRANSFER_QUEUE_RELEASED& pLockWasReleased)
+int BBTagInfo::stopTransfer(const LVKey* pLVKey, BBLV_Info* pLV_Info, const string& pHostName, const string& pCN_HostName, const uint64_t pJobId, const uint64_t pJobStepId, const uint64_t pHandle, const uint32_t pContribId, LOCAL_METADATA_RELEASED& pLockWasReleased)
 {
     int rc = 0;
 
@@ -733,12 +746,12 @@ int BBTagInfo::stopTransfer(const LVKey* pLVKey, BBLV_Info* pLV_Info, const stri
 
     if (pHandle == transferHandle)
     {
-        rc = parts.stopTransfer(pLVKey, pHostName, pLV_Info, pJobId, pJobStepId, pHandle, pContribId, pLockWasReleased);
+        rc = parts.stopTransfer(pLVKey, pHostName, pCN_HostName, pLV_Info, pJobId, pJobStepId, transferHandle, pContribId, pLockWasReleased);
         if (rc == 1)
         {
             int l_Value = 1;
             // Set the stopped indicator in the local metadata...
-            setStopped(pLVKey, pJobId, pJobStepId, pHandle, pContribId, l_Value);
+            setStopped(pLVKey, pJobId, pJobStepId, transferHandle, pContribId, l_Value);
         }
     }
 
@@ -866,8 +879,21 @@ int BBTagInfo::update_xbbServerAddData(const LVKey* pLVKey, HandleFile* pHandleF
                         errorText << "BBTagInfo::update_xbbServerAddData(): Attempt to add invalid jobstepid of " << UNDEFINED_JOBSTEPID << " to the cross bbServer metadata";
                         LOG_ERROR_TEXT_RC_AND_BAIL(errorText, rc);
                     }
+                    else if (pContribId == NO_CONTRIBID)
+                    {
+                        rc = -1;
+                        errorText << "BBTagInfo::update_xbbServerAddData(): Attempt to add invalid contribid of " << NO_CONTRIBID << " to the cross bbServer metadata";
+                        LOG_ERROR_TEXT_RC_AND_BAIL(errorText, rc);
+                    }
+                    else if (pContribId == UNDEFINED_CONTRIBID)
+                    {
+                        rc = -1;
+                        errorText << "BBTagInfo::update_xbbServerAddData(): Attempt to add invalid contribid of " << UNDEFINED_CONTRIBID << " to the cross bbServer metadata";
+                        LOG_ERROR_TEXT_RC_AND_BAIL(errorText, rc);
+                    }
 
-                    LOG(bb,info) << "xbbServer: Logical volume with a uuid of " << lv_uuid_str << " is not already registered.  It will be added.";
+                    LOG(bb,info) << "xbbServer: For job " << pJob.getJobId() << ", jobstepid " << pJob.getJobStepId() << ", handle " << pHandle \
+                                 << ", a logical volume with a uuid of " << lv_uuid_str << " is not currently registered.  It will be added.";
                     bfs::path l_LVUuidPath = handle / bfs::path(lv_uuid_str);
                     bfs::create_directories(l_LVUuidPath);
 

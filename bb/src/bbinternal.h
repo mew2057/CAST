@@ -84,9 +84,6 @@ extern Timer Throttle_Timer;
 extern AtomicCounter metadataCounter;
 
 void setSsdWriteDirect(unsigned int pValue);
-
-// NOTE: This lock is not used today.  Serialization of all metadata is controlled by the transfer queue lock
-//extern pthread_mutex_t MetadataMutex;
 #endif
 
 /*******************************************************************************
@@ -127,11 +124,14 @@ const int SUSPEND = 1;
 
 const bool DEFAULT_USE_DISCARD_ON_MOUNT_OPTION = false;
 const bool DEFAULT_REQUIRE_BBSERVER_METADATA_ON_PARALLEL_FILE_SYSTEM = true;
+const bool DEFAULT_GENERATE_UUID_ON_CREATE_LOGICAL_VOLUME = true;
 
+const uint64_t UNDEFINED_JOBID = 0;
+const uint64_t UNDEFINED_JOBSTEPID = 0;
 const uint64_t DEFAULT_JOBID = 1;
-const uint64_t NO_JOBID = 0;
 const uint64_t DEFAULT_JOBSTEPID = 1;
-const uint64_t NO_JOBSTEPID = 0;
+const uint64_t UNDEFINED_HANDLE = 0;
+
 
 const int32_t DEFAULT_LOGICAL_VOLUME_READAHEAD = -1;
 const int32_t DO_NOT_TRANSFER_FILE = INT32_MAX;
@@ -163,6 +163,7 @@ const string NO_CONTRIBID_STR = to_string(NO_CONTRIBID);
 const string NO_HOSTNAME = "%%_NuLl_HoStNaMe_%%";
 const string UNDEFINED_CONNECTION_NAME = "";
 const string UNDEFINED_HOSTNAME = "";
+const string DEFAULT_LOCK_DEBUG_LEVEL = "debug";
 const char DEVICE_DIRECTORY[] = "dev";
 const char DEVICE_MAPPER_DIRECTORY[] = "dev/mapper";
 const char ERROR_PREFIX[] = "ERROR - ";
@@ -202,19 +203,19 @@ enum FIND_BB_DEVNAMES_OPTION
 };
 typedef enum FIND_BB_DEVNAMES_OPTION FIND_BB_DEVNAMES_OPTION;
 
-enum TRANSFER_QUEUE_RELEASED
+enum LOCAL_METADATA_RELEASED
 {
-    TRANSFER_QUEUE_LOCK_NOT_RELEASED    = 0,
-    TRANSFER_QUEUE_LOCK_RELEASED        = 1
+    LOCAL_METADATA_LOCK_NOT_RELEASED    = 0,
+    LOCAL_METADATA_LOCK_RELEASED        = 1
 };
-typedef enum TRANSFER_QUEUE_RELEASED TRANSFER_QUEUE_RELEASED;
+typedef enum LOCAL_METADATA_RELEASED LOCAL_METADATA_RELEASED;
 
 enum HANDLEFILE_LOCK_OPTION
 {
     TEST_FOR_HANDLEFILE_LOCK        = -1,   // Not currently used
     DO_NOT_LOCK_HANDLEFILE          = 0,
     LOCK_HANDLEFILE                 = 1,
-    LOCK_HANDLEFILE_WITH_TEST_FIRST = 2     // Not curently used
+    LOCK_HANDLEFILE_WITH_TEST_FIRST = 2     // Not currently used
 };
 typedef enum HANDLEFILE_LOCK_OPTION HANDLEFILE_LOCK_OPTION;
 

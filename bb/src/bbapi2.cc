@@ -39,7 +39,7 @@ using namespace std;
 txp::Log bbapi2_log(txp::Log::DEFAULT_LOG_DESTINATION, txp::Log::DEFAULT_OPEN_LOGSTATE, txp::Log::DEBUG_LOGLEVEL);
 #endif
 
-uint64_t BBJOBID = 0;
+uint64_t BBJOBID = UNDEFINED_JOBID;
 
 /*******************************************************************************
  | Helper routines
@@ -59,10 +59,10 @@ static int bbapi_SetVariable(const string& pVariable, const string& pValue)
 
         rc = sendMessage(ProcessId, msg, reply);
         delete msg;
-        if (rc) LOG_RC_AND_BAIL(rc);
+        if (rc) SET_RC_AND_BAIL(rc);
 
         rc = waitReply(reply, msg);
-        if (rc) LOG_RC_AND_BAIL(rc);
+        if (rc) SET_RC_AND_BAIL(rc);
 
         rc = bberror.merge(msg);
         delete msg;
@@ -330,10 +330,10 @@ int Coral_GetVar(const char* pVariable)
 
         rc = sendMessage(ProcessId, msg, reply);
         delete msg;
-        if (rc) LOG_RC_AND_BAIL(rc);
+        if (rc) SET_RC_AND_BAIL(rc);
 
         rc = waitReply(reply, msg);
-        if (rc) LOG_RC_AND_BAIL(rc);
+        if (rc) SET_RC_AND_BAIL(rc);
 
         rc = bberror.merge(msg);
 
@@ -375,10 +375,10 @@ int Coral_SetVar(const char* pVariable, const char* pValue)
 
         rc = sendMessage(ProcessId, msg, reply);
         delete msg;
-        if (rc) LOG_RC_AND_BAIL(rc);
+        if (rc) SET_RC_AND_BAIL(rc);
 
         rc = waitReply(reply, msg);
-        if (rc) LOG_RC_AND_BAIL(rc);
+        if (rc) SET_RC_AND_BAIL(rc);
 
         rc = bberror.merge(msg);
         delete msg;
@@ -417,7 +417,7 @@ int Coral_StageOutStart(const char* pMountpoint)
         if(rc) bberror << errloc(rc) <<bailout;
 
         rc = waitReply(reply, msg);
-        if (rc) LOG_RC_AND_BAIL(rc);
+        if (rc) SET_RC_AND_BAIL(rc);
 
         rc = bberror.merge(msg);
         delete msg;

@@ -75,7 +75,7 @@ int BBLV_Info::allExtentsTransferred(const BBTagID& pTagId)
     return rc;
 }
 
-void BBLV_Info::cancelExtents(const LVKey* pLVKey, uint64_t* pHandle, uint32_t* pContribId, TRANSFER_QUEUE_RELEASED& pLockWasReleased, const int pRemoveOption)
+void BBLV_Info::cancelExtents(const LVKey* pLVKey, uint64_t* pHandle, uint32_t* pContribId, LOCAL_METADATA_RELEASED& pLockWasReleased, const int pRemoveOption)
 {
     // Sort the extents, moving the canceled extents to the front of
     // the work queue so they are immediately removed...
@@ -108,12 +108,12 @@ void BBLV_Info::cancelExtents(const LVKey* pLVKey, uint64_t* pHandle, uint32_t* 
                                  << ", waiting for all canceled extents to finished being processed.  Delay of 1 second before retry.";
                 }
 
-                unlockTransferQueue(pLVKey, "cancelExtents - Waiting for the canceled extents to be processed");
+                unlockLocalMetadata(pLVKey, "cancelExtents - Waiting for the canceled extents to be processed");
                 {
-                    pLockWasReleased = TRANSFER_QUEUE_LOCK_RELEASED;
+                    pLockWasReleased = LOCAL_METADATA_LOCK_RELEASED;
                     usleep((useconds_t)1000000);    // Delay 1 second
                 }
-                lockTransferQueue(pLVKey, "cancelExtents - Waiting for the canceled extents to be processed");
+                lockLocalMetadata(pLVKey, "cancelExtents - Waiting for the canceled extents to be processed");
                 ++l_Attempts;
             }
             else
@@ -130,9 +130,23 @@ void BBLV_Info::cancelExtents(const LVKey* pLVKey, uint64_t* pHandle, uint32_t* 
     if (pRemoveOption == REMOVE_TARGET_PFS_FILES)
     {
         // Remove the target files
-        LOG(bb,info) << "Start: Removing target files associated with transfer " << *pLVKey << ", handle " << *pHandle << ", contribid " << *pContribId;
+        if (*pContribId != UNDEFINED_CONTRIBID)
+        {
+            LOG(bb,info) << "Start: Removing target files associated with transfer " << *pLVKey << ", handle " << *pHandle << ", contribid " << *pContribId;
+        }
+        else
+        {
+            LOG(bb,info) << "Start: Removing target files associated with transfer " << *pLVKey << ", handle " << *pHandle << ", all contributors.";
+        }
         removeTargetFiles(pLVKey, *pHandle, *pContribId);
-        LOG(bb,info) << "Completed: Removing target files associated with transfer " << *pLVKey << ", handle " << *pHandle << ", contribid " << *pContribId;
+        if (*pContribId != UNDEFINED_CONTRIBID)
+        {
+            LOG(bb,info) << "Completed: Removing target files associated with transfer " << *pLVKey << ", handle " << *pHandle << ", contribid " << *pContribId;
+        }
+        else
+        {
+            LOG(bb,info) << "Completed: Removing target files associated with transfer " << *pLVKey << ", handle " << *pHandle << ", all contributors.";
+        }
     }
 
     return;
@@ -167,13 +181,13 @@ void BBLV_Info::dump(char* pSev, const char* pPrefix)
     return;
 }
 
-void BBLV_Info::ensureStageOutEnded(const LVKey* pLVKey, TRANSFER_QUEUE_RELEASED& pLockWasReleased)
+void BBLV_Info::ensureStageOutEnded(const LVKey* pLVKey, LOCAL_METADATA_RELEASED& pLockWasReleased)
 {
     // NOTE: pLockWasReleased intentionally not initialized
 
     if (!stageOutEnded())
     {
-        LOG(bb,info) << "taginfo: Stageout end processing being initiated for jobid " << jobid << ", for " << *pLVKey;
+        LOG(bb,debug) << "taginfo: Stageout end processing being initiated for jobid " << jobid << ", for " << *pLVKey;
 
         // NOTE: if stageoutEnd() fails, it fills in errstate.  However, we are not setting a rc here...
         if (stageoutEnd(string(""), pLVKey, FORCED))
@@ -186,9 +200,9 @@ void BBLV_Info::ensureStageOutEnded(const LVKey* pLVKey, TRANSFER_QUEUE_RELEASED
         uint32_t i = 0;
         while (!stageOutEndedComplete())
         {
-            unlockTransferQueue(pLVKey, "ensureStageOutEnded - Waiting for stageout end to complete");
+            unlockLocalMetadata(pLVKey, "ensureStageOutEnded - Waiting for stageout end to complete");
             {
-                pLockWasReleased = TRANSFER_QUEUE_LOCK_RELEASED;
+                pLockWasReleased = LOCAL_METADATA_LOCK_RELEASED;
                 if (!(i++ % 30))
                 {
                     FL_Write(FLDelay, StageOutEnd, "Waiting for stageout end processing to complete for jobid %ld.",
@@ -197,7 +211,7 @@ void BBLV_Info::ensureStageOutEnded(const LVKey* pLVKey, TRANSFER_QUEUE_RELEASED
                 }
                 usleep((useconds_t)2000000);
            }
-           lockTransferQueue(pLVKey, "ensureStageOutEnded - Waiting for stageout end to complete");
+           lockLocalMetadata(pLVKey, "ensureStageOutEnded - Waiting for stageout end to complete");
         }
     }
 
@@ -247,15 +261,20 @@ int BBLV_Info::getTransferHandle(uint64_t& pHandle, const LVKey* pLVKey, const B
 
     if(!l_TagInfo)
     {
-        int l_GeneratedHandle = 0;
+        int l_GeneratedHandle = UNDEFINED_HANDLE;
         BBTagInfo l_NewTagInfo = BBTagInfo(&tagInfoMap, pNumContrib, pContrib, pJob, pTag, l_GeneratedHandle);
-        rc = tagInfoMap.addTagInfo(pLVKey, pJob, l_TagId, l_NewTagInfo, l_GeneratedHandle);
-        if (!rc) {
-            l_TagInfo = tagInfoMap.getTagInfo(l_TagId);
+        BBTagInfo* l_NewTagInfoPtr = &l_NewTagInfo;
+        rc = tagInfoMap.addTagInfo(pLVKey, pJob, l_TagId, l_NewTagInfoPtr, l_GeneratedHandle);
+        if (!rc)
+        {
+            // NOTE:  addTagInfo() returns addressability to the newly inserted BBTagInfo object in BBTagInfoMap
+            l_TagInfo = l_NewTagInfoPtr;
             LOG(bb,debug) << "taginfo: Adding TagID(" << l_JobStr.str() << "," << l_TagId.getTag() << ") with handle 0x" \
                           << hex << uppercase << setfill('0') << setw(16) << l_TagInfo->transferHandle \
                           << setfill(' ') << nouppercase << dec << " (" << l_TagInfo->transferHandle << ") to " << *pLVKey;
-        } else {
+        }
+        else
+        {
             // NOTE: errstate already filled in...
             errorText << "getTransferHandle: Failure from addTagInfo(), rc = " << rc;
             LOG_ERROR(errorText);
@@ -315,6 +334,8 @@ void BBLV_Info::removeFromInFlight(const string& pConnectionName, const LVKey* p
 
     const uint32_t THIS_EXTENT_IS_IN_THE_INFLIGHT_QUEUE = 1;
     bool l_UpdateTransferStatus = false;
+    bool l_LockTransferQueue = false;
+    bool l_LocalMetadataLocked = false;
 
     // Check to see if this is the last extent to be transferred for the source file
     // NOTE:  isCP_Transfer() indicates this is a transfer performed via cp, either locally on
@@ -361,15 +382,16 @@ void BBLV_Info::removeFromInFlight(const string& pConnectionName, const LVKey* p
                 lockTransferQueue(pLVKey, "removeFromInFlight - Waiting for inflight queue to clear");
             }
 
-            if (!pExtentInfo.getTransferDef()->stopped())
+            unlockTransferQueue(pLVKey, "removeFromInFlight - Last extent for file transfer, before fsync");
+            l_LockTransferQueue = true;
+
+            if ((!pExtentInfo.getTransferDef()->stopped()) && (!pExtentInfo.getTransferDef()->canceled()))
             {
                 uint16_t l_BundleId = pExtentInfo.getExtent()->getBundleID();
                 BBIO* l_IO = pExtentInfo.getTransferDef()->iomap[l_BundleId];
                 if (l_IO)
                 {
                     // Perform any necessary syncing of the data for the target file
-                    unlockTransferQueue(pLVKey, "removeFromInFlight - Before fsync");
-
                     try
                     {
                         if (pExtentInfo.getExtent()->flags & BBI_TargetSSD)
@@ -409,8 +431,6 @@ void BBLV_Info::removeFromInFlight(const string& pConnectionName, const LVKey* p
                         LOG(bb,error) << "removeFromInFlight(): Exception thrown when attempting to sync the data: " << e.what();
                         pExtentInfo.getExtent()->dump("info", "Exception thrown when attempting to sync the data");
                     }
-
-                    lockTransferQueue(pLVKey, "removeFromInFlight - After fsync");
                 }
                 else
                 {
@@ -418,6 +438,8 @@ void BBLV_Info::removeFromInFlight(const string& pConnectionName, const LVKey* p
                 }
             }
             // Update the status for the file in xbbServer data
+            l_LocalMetadataLocked = lockLocalMetadataIfNeeded(pLVKey, "removeFromInFlight - Last extent for file transfer");
+
             ContribIdFile::update_xbbServerFileStatus(pLVKey, pExtentInfo.getTransferDef(), pExtentInfo.getHandle(), pExtentInfo.getContrib(), pExtentInfo.getExtent(), BBTD_All_Extents_Transferred);
             l_UpdateTransferStatus = true;
         }
@@ -425,6 +447,11 @@ void BBLV_Info::removeFromInFlight(const string& pConnectionName, const LVKey* p
     else
     {
         // Update the status for the file in xbbServer data
+        unlockTransferQueue(pLVKey, "removeFromInFlight - cp");
+        l_LockTransferQueue = true;
+
+        l_LocalMetadataLocked = lockLocalMetadataIfNeeded(pLVKey, "removeFromInFlight - cp");
+
         ContribIdFile::update_xbbServerFileStatus(pLVKey, pExtentInfo.getTransferDef(), pExtentInfo.getHandle(), pExtentInfo.getContrib(), pExtentInfo.getExtent(), BBTD_All_Extents_Transferred);
         l_UpdateTransferStatus = true;
     }
@@ -438,27 +465,6 @@ void BBLV_Info::removeFromInFlight(const string& pConnectionName, const LVKey* p
         //       when updateAllTransferStatus() is invoked above.
     }
 
-    if (pExtentInfo.getTransferDef()->stopped())
-    {
-        string l_Hostname;
-        activecontroller->gethostname(l_Hostname);
-        string l_ServicingHostname = ContribIdFile::isServicedBy(BBJob(pExtentInfo.getTransferDef()->getJobId(), pExtentInfo.getTransferDef()->getJobStepId()), pExtentInfo.getHandle(), pExtentInfo.getContrib());
-        if (l_Hostname != l_ServicingHostname)
-        {
-            // The transfer definition is now being serviced by another bbServer.
-            // Remove this transfer definition from our local cache.
-            pTagInfo->removeTransferDef(pExtentInfo.getContrib());
-            LOG(bb,info) << "Transfer definition associated with " << *pLVKey << ", handle " << pExtentInfo.getHandle() << " contribid " << pExtentInfo.getContrib() \
-                         << " is now fully stopped. All processing to be made by this bbServer for this transfer definition is now complete. This transfer definition is now being serviced by " \
-                         << l_ServicingHostname << ". The local cached version of the transfer definition is now deleted.";
-        }
-        else
-        {
-            LOG(bb,info) << "Transfer definition associated with " << *pLVKey << ", handle " << pExtentInfo.getHandle() << " contribid " << pExtentInfo.getContrib() \
-                         << " is now fully stopped. This transfer definiiton is still being serviced by this bbServer so all local cached metadata will be retained.";
-        }
-    }
-
     // NOTE:  Removing the extent from the in-flight queue has to be done AFTER
     //        any metadata updates above.  When running with multiple transfer threads,
     //        this entry must remain in the queue as the lock on the transfer queue
@@ -467,6 +473,16 @@ void BBLV_Info::removeFromInFlight(const string& pConnectionName, const LVKey* p
     //        during that time.
     // Remove the extent from the in-flight queue...
     extentInfo.removeFromInFlight(pLVKey, pExtentInfo);
+
+    if (l_LocalMetadataLocked)
+    {
+        unlockLocalMetadata(pLVKey, "removeFromInFlight - After status updates, before return");
+    }
+
+    if (l_LockTransferQueue)
+    {
+        lockTransferQueue(pLVKey, "removeFromInFlight - After status updates, before return");
+    }
 
     return;
 }
@@ -546,8 +562,8 @@ void BBLV_Info::sendTransferCompleteForContribIdMsg(const string& pConnectionNam
     char lv_uuid_str[LENGTH_UUID_STR] = {'\0'};
     lv_uuid.copyTo(lv_uuid_str);
 
-    LOG(bb,info) << "->bbproxy: Transfer " << l_TransferStatusStr << " for contribid " << pContribId \
-                 << ":  " << *pLVKey << ", handle " << pHandle << ", status " << l_StatusStr;
+    LOG(bb,info) << "->bbproxy: Transfer " << l_TransferStatusStr << " for contribid " << pContribId << ":";
+    LOG(bb,info) << "           " << *pLVKey << ", handle " << pHandle << ", status " << l_StatusStr;
 
     // NOTE:  The char array is copied to heap by addAttribute and the storage for
     //        the logical volume uuid attribute is owned by the message facility.
@@ -693,11 +709,11 @@ void BBLV_Info::sendTransferCompleteForFileMsg(const string& pConnectionName, co
     l_Complete->addAttribute(txp::status, (int64_t)l_FileStatus);
     l_Complete->addAttribute(txp::sizetransferred, (int64_t)l_SizeTransferred);
 
-    bool l_LockTransferQueue = false;
-    if (wrkqmgr.transferQueueIsLocked())
+    bool l_LockLocalMetadata = false;
+    if (localMetadataIsLocked())
     {
-        l_LockTransferQueue = true;
-        unlockTransferQueue(pLVKey, "sendTransferCompleteForFileMsg");
+    	l_LockLocalMetadata = true;
+        unlockLocalMetadata(pLVKey, "sendTransferCompleteForFileMsg");
     }
 
     // Send the message and wait for reply
@@ -713,10 +729,9 @@ void BBLV_Info::sendTransferCompleteForFileMsg(const string& pConnectionName, co
         assert(strlen(e.what())==0);
     }
 
-
-    if (l_LockTransferQueue)
+    if (l_LockLocalMetadata)
     {
-        lockTransferQueue(pLVKey, "sendTransferCompleteForFileMsg");
+    	lockLocalMetadata(pLVKey, "sendTransferCompleteForFileMsg");
     }
 
     if (rc)
@@ -752,7 +767,8 @@ void BBLV_Info::sendTransferCompleteForHandleMsg(const string& pHostName, const 
     getStrFromBBStatus(l_Status, l_StatusStr, sizeof(l_StatusStr));
 
     char l_TransferStatusStr[64] = {'\0'};
-    switch (l_Status) {
+    switch (l_Status)
+    {
         case BBSTOPPED:
         {
             strCpy(l_TransferStatusStr, "stopped", sizeof(l_TransferStatusStr));
@@ -786,8 +802,8 @@ void BBLV_Info::sendTransferCompleteForHandleMsg(const string& pHostName, const 
         char lv_uuid_str[LENGTH_UUID_STR] = {'\0'};
         lv_uuid.copyTo(lv_uuid_str);
 
-        LOG(bb,info) << "->bbproxy: Transfer " << l_TransferStatusStr << " for handle " << pHandle \
-                     << ":  " << *pLVKey << ", status " << l_StatusStr;
+        LOG(bb,info) << "->bbproxy: Transfer " << l_TransferStatusStr << " for handle " << pHandle << ":";
+        LOG(bb,info) << "           " << *pLVKey << ", status " << l_StatusStr;
 
         // NOTE:  The char array is copied to heap by addAttribute and the storage for
         //        the logical volume uuid attribute is owned by the message facility.
@@ -818,7 +834,7 @@ void BBLV_Info::sendTransferCompleteForHandleMsg(const string& pHostName, const 
                     // NOTE: No need to catch the return code.  If the append doesn't work,
                     //       appendAsyncRequest() will log the failure...
                     char l_AsyncCmd[AsyncRequest::MAX_DATA_LENGTH] = {'\0'};
-                    snprintf(l_AsyncCmd, sizeof(l_AsyncCmd), "handle %lu %lu %lu 0 0 %s %s", pTagId.getJobId(), pTagId.getJobStepId(), pHandle, pCN_HostName.c_str(), l_TransferStatusStr);
+                    snprintf(l_AsyncCmd, sizeof(l_AsyncCmd), "handle %lu %lu %lu 0 0 %s %s", pTagId.getJobId(), pTagId.getJobStepId(), pHandle, pCN_HostName.c_str(), l_StatusStr);
                     AsyncRequest l_Request = AsyncRequest(l_AsyncCmd);
                     wrkqmgr.appendAsyncRequest(l_Request);
                     pAppendAsyncRequestFlag = ASYNC_REQUEST_HAS_BEEN_APPENDED;
@@ -840,20 +856,14 @@ void BBLV_Info::sendTransferCompleteForHandleMsg(const string& pHostName, const 
     return;
 }
 
-void BBLV_Info::setAllExtentsTransferred(const LVKey* pLVKey, const uint64_t pHandle, const BBLV_ExtentInfo& pLVKey_ExtentInfo, const BBTagID pTagId, const int pValue)
+void BBLV_Info::setAllExtentsTransferred(const LVKey* pLVKey, const uint64_t pHandle, ExtentInfo& pExtentInfo, const BBTagID pTagId, const int pValue)
 {
-    BBTagInfo* l_TagInfo = tagInfoMap.getTagInfo(pTagId);
-    if (l_TagInfo)
-    {
-        l_TagInfo->setAllExtentsTransferred(pLVKey, pTagId.getJobId(), pTagId.getJobStepId(), pHandle, pValue);
-    } else {
-        // Send error message...
-    }
+    pExtentInfo.getTagInfo()->setAllExtentsTransferred(pLVKey, pTagId.getJobId(), pTagId.getJobStepId(), pHandle, pValue);
 
     return;
 }
 
-void BBLV_Info::setCanceled(const LVKey* pLVKey, const uint64_t pJobId, const uint64_t pJobStepId, uint64_t pHandle, TRANSFER_QUEUE_RELEASED& pLockWasReleased, const int pRemoveOption)
+void BBLV_Info::setCanceled(const LVKey* pLVKey, const uint64_t pJobId, const uint64_t pJobStepId, uint64_t pHandle, LOCAL_METADATA_RELEASED& pLockWasReleased, const int pRemoveOption)
 {
     // NOTE: pLockWasReleased intentionally not initialized
 
@@ -876,7 +886,7 @@ int BBLV_Info::setSuspended(const LVKey* pLVKey, const string& pHostName, const 
 
     if (pHostName == UNDEFINED_HOSTNAME || pHostName == hostname)
     {
-        rc = extentInfo.setSuspended(pLVKey, pHostName, jobid, pValue);
+        rc = extentInfo.setSuspended(pLVKey, hostname, jobid, pValue);
     }
     else
     {
@@ -886,17 +896,17 @@ int BBLV_Info::setSuspended(const LVKey* pLVKey, const string& pHostName, const 
     return rc;
 }
 
-int BBLV_Info::stopTransfer(const LVKey* pLVKey, const string& pHostName, const uint64_t pJobId, const uint64_t pJobStepId, uint64_t pHandle, uint32_t pContribId, TRANSFER_QUEUE_RELEASED& pLockWasReleased)
+int BBLV_Info::stopTransfer(const LVKey* pLVKey, const string& pHostName, const string& pCN_HostName, const uint64_t pJobId, const uint64_t pJobStepId, uint64_t pHandle, uint32_t pContribId, LOCAL_METADATA_RELEASED& pLockWasReleased)
 {
     int rc = 0;
 
     // NOTE: pLockWasReleased intentionally not initialized
 
-    if ((pHostName == UNDEFINED_HOSTNAME || pHostName == hostname) && (pJobId == UNDEFINED_JOBID || pJobId == jobid))
+    if ((pCN_HostName == UNDEFINED_HOSTNAME || pCN_HostName == hostname) && (pJobId == UNDEFINED_JOBID || pJobId == jobid))
     {
         if (!stageOutStarted())
         {
-            rc = tagInfoMap.stopTransfer(pLVKey, this, pHostName, pJobId, pJobStepId, pHandle, pContribId, pLockWasReleased);
+            rc = tagInfoMap.stopTransfer(pLVKey, this, pHostName, hostname, jobid, pJobStepId, pHandle, pContribId, pLockWasReleased);
 
             if (rc == 1)
             {
@@ -914,8 +924,8 @@ int BBLV_Info::stopTransfer(const LVKey* pLVKey, const string& pHostName, const 
             // torn down...)  Therefore, the only meaningful thing left to be done is remove job information.
             // Return an error message.
             rc = -1;
-            LOG(bb,error) << "BBLV_Info::stopTransfer(): For hostname " << pHostName << ", connection " \
-                          << connectionName << ", jobid " << pJobId << ", jobidstep " << pJobStepId \
+            LOG(bb,error) << "BBLV_Info::stopTransfer(): For hostname " << hostname << ", connection " \
+                          << connectionName << ", jobid " << jobid << ", jobidstep " << pJobStepId \
                           << ", handle " << pHandle << ", contribid " << pContribId \
                           << ", the remove logical volume request has been run, or is currently running for " << *pLVKey \
                           << ". Suspend or resume operations are not allowed for this environment.";
@@ -948,6 +958,8 @@ int BBLV_Info::updateAllTransferStatus(const string& pConnectionName, const LVKe
     int l_NewStatus = 0;
     int l_ExtentsRemainForSourceIndex = 1;
     bool l_SetFileClosedIndicator = false;
+
+    int l_LocalMetadataLocked = lockLocalMetadataIfNeeded(pLVKey, "BBLV_Info::updateAllTransferStatus");
 
     updateTransferStatus(pLVKey, pExtentInfo, l_TransferDef, l_NewStatus, l_ExtentsRemainForSourceIndex, pNumberOfExpectedInFlight);
     if (!l_ExtentsRemainForSourceIndex)
@@ -1006,7 +1018,12 @@ int BBLV_Info::updateAllTransferStatus(const string& pConnectionName, const LVKe
     {
         if (!l_TransferDef->stopped())
         {
+            if (l_LocalMetadataLocked)
+            {
+                unlockLocalMetadata(pLVKey, "BBLV_Info::updateAllTransferStatus - before sendTransferCompleteForContribIdMsg");
+            }
             sendTransferCompleteForContribIdMsg(pConnectionName, pLVKey, pExtentInfo.getHandle(), pExtentInfo.getContrib(), l_TransferDef);
+            l_LocalMetadataLocked = lockLocalMetadataIfNeeded(pLVKey, "BBLV_Info::updateAllTransferStatus - after sendTransferCompleteForContribIdMsg");
         }
 
         // Status changed for transfer definition...
@@ -1032,11 +1049,18 @@ int BBLV_Info::updateAllTransferStatus(const string& pConnectionName, const LVKe
         }
     }
 
+    if (l_LocalMetadataLocked)
+    {
+        unlockLocalMetadata(pLVKey, "BBLV_Info::updateAllTransferStatus");
+    }
+
     return rc;
 }
 
 void BBLV_Info::updateTransferStatus(const LVKey* pLVKey, ExtentInfo& pExtentInfo, const BBTagID& pTagId, const int32_t pContribId, int& pNewStatus, uint32_t pNumberOfExpectedInFlight)
 {
+    int l_LocalMetadataLocked = lockLocalMetadataIfNeeded(pLVKey, "BBLV_Info::updateTransferStatus");
+
     // NOTE:  The following method retrieves its information from the xbbServer metadata...
     if (allContribsReported(pExtentInfo.getHandle(), pTagId)) {
         // NOTE:  The following method retrieves its information from the xbbServer metadata...
@@ -1051,10 +1075,15 @@ void BBLV_Info::updateTransferStatus(const LVKey* pLVKey, ExtentInfo& pExtentInf
             case 1:
             {
                 pNewStatus = 1;
-                setAllExtentsTransferred(pLVKey, pExtentInfo.getHandle(), extentInfo, pTagId);
+                setAllExtentsTransferred(pLVKey, pExtentInfo.getHandle(), pExtentInfo, pTagId);
                 break;
             }
         }
+    }
+
+    if (l_LocalMetadataLocked)
+    {
+        unlockLocalMetadata(pLVKey, "BBLV_Info::updateTransferStatus");
     }
 
     return;

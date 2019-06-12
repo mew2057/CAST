@@ -18,6 +18,8 @@
 #include <map>
 #include <utility>
 
+#include "time.h"
+
 #include "bbinternal.h"
 #include "BBTagID.h"
 #include "bbwrkqe.h"
@@ -190,18 +192,20 @@ class HeartbeatEntry
 {
   public:
     HeartbeatEntry() :
-        count(0),
-        currentTime(""),
-        serverCurrentTime("") {
+        count(0)
+    {
+        currentTime = timeval {.tv_sec=0, .tv_usec=0};
+        serverCurrentTime = "";
     }
 
-    HeartbeatEntry(const uint64_t pCount, const string& pCurrentTime, const string& pServerCurrentTime) :
+    HeartbeatEntry(const uint64_t pCount, const struct timeval& pCurrentTime, const string& pServerCurrentTime) :
         count(pCount),
         currentTime(pCurrentTime),
         serverCurrentTime(pServerCurrentTime) {
     }
 
-    static string getHeartbeatCurrentTime();
+    static void getCurrentTime(struct timeval& pTime);
+    static string getHeartbeatCurrentTimeStr();
 
     inline uint64_t getCount()
     {
@@ -213,7 +217,7 @@ class HeartbeatEntry
         return serverCurrentTime;
     }
 
-    inline string getTime()
+    inline struct timeval getTime()
     {
         return currentTime;
     }
@@ -227,9 +231,11 @@ class HeartbeatEntry
 
     ~HeartbeatEntry() {};
 
+    int serverDeclaredDead(const uint64_t pAllowedNumberOfSeconds);
+
     uint64_t count;             // Incremented when ANY command is received
                                 // from a given bbServer.
-    string currentTime;         // Timestamp of when ANY command was last received
+    struct timeval currentTime; // Timestamp of when ANY command was last received
                                 // from a given bbServer.
     string serverCurrentTime;   // Timestamp provided by the reporting bbServer.
                                 // Only updated when a real heartbeat command
@@ -279,6 +285,7 @@ class WRKQMGR
             heartbeatData = map<string, HeartbeatEntry>();
             outOfOrderOffsets = vector<uint64_t>();
             lockPinned = 0;
+            issuingWorkItem = 0;
             checkForCanceledExtents = 0;
             transferQueueLocked = 0;
         };
@@ -530,6 +537,13 @@ class WRKQMGR
         return;
     }
 
+    inline void setIssuingWorkItem(const int pValue)
+    {
+        issuingWorkItem = pValue;
+
+        return;
+    }
+
     inline void setLastQueueProcessed(LVKey* pLVKey)
     {
         LOG(bb,debug) << "WRKQMGR::setLastQueueProcessed(): lastQueueProcessed changing from = " << lastQueueProcessed << " to " << *pLVKey;
@@ -537,7 +551,6 @@ class WRKQMGR
 
         return;
     }
-
 
     inline void setLastQueueWithEntries(LVKey pLVKey)
     {
@@ -608,7 +621,7 @@ class WRKQMGR
 
     // Methods
     void addHPWorkItem(LVKey* pLVKey, BBTagID& pTagId);
-    int addWrkQ(const LVKey* pLVKey, const uint64_t pJobId, const int pSuspendIndicator);
+    int addWrkQ(const LVKey* pLVKey, BBLV_Info* pLV_Info, const uint64_t pJobId, const int pSuspendIndicator);
     int appendAsyncRequest(AsyncRequest& pRequest);
     void calcThrottleMode();
     uint64_t checkForNewHPWorkItems();
@@ -616,13 +629,17 @@ class WRKQMGR
     int createAsyncRequestFile(const char* pAsyncRequestFileName);
     void dump(const char* pSev, const char* pPrefix, DUMP_OPTION pOption=DUMP_ALWAYS);
     void dump(queue<WorkID>* l_WrkQ, WRKQE* l_WrkQE, const char* pSev, const char* pPostfix);
+    void endProcessingHP_Request(AsyncRequest& pRequest);
     int findOffsetToNextAsyncRequest(int &pSeqNbr, int64_t &pOffset);
     void dumpHeartbeatData(const char* pSev, const char* pPrefix=0);
     int findWork(const LVKey* pLVKey, WRKQE* &pWrkQE);
     int getAsyncRequest(WorkID& pWorkItem, AsyncRequest& pRequest);
+    HeartbeatEntry* getHeartbeatEntry(const string& pHostName);
+    uint64_t getDeclareServerDeadCount(const BBJob pJob, const uint64_t pHandle, const int32_t pContribId);
     int getThrottleRate(LVKey* pLVKey, uint64_t& pRate);
     int getWrkQE(const LVKey* pLVKey, WRKQE* &pWrkQE);
     int getWrkQE_WithCanceledExtents(WRKQE* &pWrkQE);
+    int isServerDead(const BBJob pJob, const uint64_t pHandle, const int32_t pContribId);
     void loadBuckets();
     void lock(const LVKey* pLVKey, const char* pMethod);
     void manageWorkItemsProcessed(const WorkID& pWorkItem);
@@ -638,6 +655,7 @@ class WRKQMGR
     int setSuspended(const LVKey* pLVKey, const int pValue);
     int setThrottleRate(const LVKey* pLVKey, const uint64_t pRate);
     void setThrottleTimerPoppedCount(const double pTimerInterval);
+    int startProcessingHP_Request(AsyncRequest& pRequest);
     void unlock(const LVKey* pLVKey, const char* pMethod);
     void unpinLock(const LVKey* pLVKey, const char* pMethod);
     void updateHeartbeatData(const string& pHostName);
@@ -677,8 +695,10 @@ class WRKQMGR
     map<LVKey, WRKQE*>  wrkqs;
     map<string, HeartbeatEntry> heartbeatData;
     vector<uint64_t>    outOfOrderOffsets;
+    vector<string>      inflightHP_Requests;
   private:
     int                 lockPinned;
+    volatile int        issuingWorkItem;
     volatile int        checkForCanceledExtents;
     pthread_t           transferQueueLocked;
 };

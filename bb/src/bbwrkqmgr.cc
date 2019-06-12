@@ -18,8 +18,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "time.h"
-
 #include "bbinternal.h"
 #include "BBLV_Info.h"
 #include "BBLV_Metadata.h"
@@ -92,23 +90,17 @@ int isGpfsFile(const char* pFileName, bool& pValue)
     return rc;
 }
 
-
-/*
- * Static methods
- */
-string HeartbeatEntry::getHeartbeatCurrentTime()
+string timevalToStr(const struct timeval& pTime)
 {
 	char l_Buffer[20] = {'\0'};
 	char l_ReturnTime[27] = {'\0'};
 
-    timeval l_CurrentTime;
-    gettimeofday(&l_CurrentTime, NULL);
-    unsigned long l_Micro = l_CurrentTime.tv_usec;
+    unsigned long l_Micro = pTime.tv_usec;
 
     // localtime is not thread safe
     // NOTE:  No spaces in the formatted timestamp, because this can be sent as part of an
     //        async request message.  That processing uses scanf to parse the data...
-    strftime(l_Buffer, sizeof(l_Buffer), "%Y-%m-%d_%H:%M:%S", localtime((const time_t*)&l_CurrentTime.tv_sec));
+    strftime(l_Buffer, sizeof(l_Buffer), "%Y-%m-%d_%H:%M:%S", localtime((const time_t*)&pTime.tv_sec));
     snprintf(l_ReturnTime, sizeof(l_ReturnTime), "%s.%06lu", l_Buffer, l_Micro);
 
     return string(l_ReturnTime);
@@ -116,13 +108,40 @@ string HeartbeatEntry::getHeartbeatCurrentTime()
 
 
 /*
+ * Static methods
+ */
+void HeartbeatEntry::getCurrentTime(struct timeval& pTime)
+{
+    gettimeofday(&pTime, NULL);
+
+    return;
+}
+
+string HeartbeatEntry::getHeartbeatCurrentTimeStr()
+{
+    struct timeval l_CurrentTime = timeval {.tv_sec=0, .tv_usec=0};
+    getCurrentTime(l_CurrentTime);
+
+    return timevalToStr(l_CurrentTime);
+}
+
+
+/*
  * Non-static methods
  */
+int HeartbeatEntry::serverDeclaredDead(const uint64_t pAllowedNumberOfSeconds)
+{
+    struct timeval l_CurrentTime = timeval {.tv_sec=0, .tv_usec=0};
+    getCurrentTime(l_CurrentTime);
+    struct timeval l_LastTimeServerReported = getTime();
+
+    return ((uint64_t)(l_CurrentTime.tv_sec - l_LastTimeServerReported.tv_sec) < pAllowedNumberOfSeconds ? 0 : 1);
+}
 
 void WRKQMGR::addHPWorkItem(LVKey* pLVKey, BBTagID& pTagId)
 {
     // Build the high priority work item
-    WorkID l_WorkId(*pLVKey, pTagId);
+    WorkID l_WorkId(*pLVKey, (BBLV_Info*)0, pTagId);
 
     // Push the work item onto the HP work queue and post
     l_WorkId.dump("debug", "addHPWorkItem() ");
@@ -132,7 +151,7 @@ void WRKQMGR::addHPWorkItem(LVKey* pLVKey, BBTagID& pTagId)
     return;
 }
 
-int WRKQMGR::addWrkQ(const LVKey* pLVKey, const uint64_t pJobId, const int pSuspendIndicator)
+int WRKQMGR::addWrkQ(const LVKey* pLVKey, BBLV_Info* pLV_Info, const uint64_t pJobId, const int pSuspendIndicator)
 {
     int rc = 0;
 
@@ -143,7 +162,7 @@ int WRKQMGR::addWrkQ(const LVKey* pLVKey, const uint64_t pJobId, const int pSusp
     std::map<LVKey,WRKQE*>::iterator it = wrkqs.find(*pLVKey);
     if (it == wrkqs.end())
     {
-        WRKQE* l_WrkQE = new WRKQE(pLVKey, pJobId, pSuspendIndicator);
+        WRKQE* l_WrkQE = new WRKQE(pLVKey, pLV_Info, pJobId, pSuspendIndicator);
         l_WrkQE->setDumpOnRemoveWorkItem(config.get("bb.bbserverDumpWorkQueueOnRemoveWorkItem", DEFAULT_DUMP_QUEUE_ON_REMOVE_WORK_ITEM));
         wrkqs.insert(std::pair<LVKey,WRKQE*>(*pLVKey, l_WrkQE));
     }
@@ -394,7 +413,7 @@ void WRKQMGR::checkThrottleTimer()
         {
             // Tell the world this bbServer is still alive...
             char l_AsyncCmd[AsyncRequest::MAX_DATA_LENGTH] = {'\0'};
-            string l_CurrentTime = HeartbeatEntry::getHeartbeatCurrentTime();
+            string l_CurrentTime = HeartbeatEntry::getHeartbeatCurrentTimeStr();
             snprintf(l_AsyncCmd, sizeof(l_AsyncCmd), "heartbeat 0 0 0 0 0 None %s", l_CurrentTime.c_str());
             AsyncRequest l_Request = AsyncRequest(l_AsyncCmd);
             appendAsyncRequest(l_Request);
@@ -507,7 +526,7 @@ void WRKQMGR::dump(const char* pSev, const char* pPostfix, DUMP_OPTION pDumpOpti
                         LOG(bb,debug) << "          Last Queue Processed: " << lastQueueProcessed << "  Last Queue With Entries: " << lastQueueWithEntries;
                         LOG(bb,debug) << "          Async Seq#: " << asyncRequestFileSeqNbr << "  LstOff: 0x" << hex << uppercase << setfill('0') \
                                       << setw(8) << lastOffsetProcessed << "  NxtOff: 0x" << setw(8) << offsetToNextAsyncRequest \
-                                      << setfill(' ') << nouppercase << dec << "  #OutOfOrd " << outOfOrderOffsets.size();
+                                      << setfill(' ') << nouppercase << dec << "  #OutOfOrd " << outOfOrderOffsets.size() << "  #InflightHP_Rqsts: " << inflightHP_Requests.size();
                         if (outOfOrderOffsets.size())
                         {
                             LOG(bb,debug) << " Out of Order Offsets (in hex): " << l_OffsetStr.str();
@@ -537,7 +556,7 @@ void WRKQMGR::dump(const char* pSev, const char* pPostfix, DUMP_OPTION pDumpOpti
                         LOG(bb,info) << "          Last Queue Processed: " << lastQueueProcessed << "  Last Queue With Entries: " << lastQueueWithEntries;
                         LOG(bb,info) << "          Async Seq#: " << asyncRequestFileSeqNbr << "  LstOff: 0x" << hex << uppercase << setfill('0') \
                                      << setw(8) << lastOffsetProcessed << "  NxtOff: 0x" << setw(8) << offsetToNextAsyncRequest \
-                                     << setfill(' ') << nouppercase << dec << "  #OutOfOrd " << outOfOrderOffsets.size();
+                                     << setfill(' ') << nouppercase << dec << "  #OutOfOrd " << outOfOrderOffsets.size() << "  #InflightHP_Rqsts: " << inflightHP_Requests.size();
                         if (outOfOrderOffsets.size())
                         {
                             LOG(bb,info) << " Out of Order Offsets (in hex): " << l_OffsetStr.str();
@@ -598,7 +617,7 @@ void WRKQMGR::dumpHeartbeatData(const char* pSev, const char* pPrefix)
             for (auto it=heartbeatData.begin(); it!=heartbeatData.end(); ++it)
             {
                 LOG(bb,debug) << i << ") " << it->first << " -> Count " << (it->second).getCount() \
-                              << ", time reported: " << (it->second).getTime() \
+                              << ", time reported: " << timevalToStr((it->second).getTime()) \
                               << ", timestamp from bbServer: " << (it->second).getServerTime();
                 ++i;
             }
@@ -612,7 +631,7 @@ void WRKQMGR::dumpHeartbeatData(const char* pSev, const char* pPrefix)
             for (auto it=heartbeatData.begin(); it!=heartbeatData.end(); ++it)
             {
                 LOG(bb,info) << i << ") " << it->first << " -> Count " << (it->second).getCount() \
-                              << ", time reported: " << (it->second).getTime() \
+                              << ", time reported: " << timevalToStr((it->second).getTime()) \
                               << ", timestamp from bbServer: " << (it->second).getServerTime();
                 ++i;
             }
@@ -633,6 +652,21 @@ void WRKQMGR::dumpHeartbeatData(const char* pSev, const char* pPrefix)
     }
 
     heartbeatDumpCount = 0;
+
+    return;
+}
+
+void WRKQMGR::endProcessingHP_Request(AsyncRequest& pRequest)
+{
+    string l_Data = pRequest.getData();
+    for (auto it=inflightHP_Requests.begin(); it!=inflightHP_Requests.end(); ++it)
+    {
+        if (*it == l_Data)
+        {
+            inflightHP_Requests.erase(it);
+            break;
+        }
+    }
 
     return;
 }
@@ -868,6 +902,21 @@ int WRKQMGR::getAsyncRequest(WorkID& pWorkItem, AsyncRequest& pRequest)
 
     return rc;
 }
+
+uint64_t WRKQMGR::getDeclareServerDeadCount(const BBJob pJob, const uint64_t pHandle, const int32_t pContribId)
+{
+    // NOTE: If the server has been declared dead, then we return a count of 1.
+    //       Those routines that invoke this method use this count as a loop control
+    //       variable and we want to make sure that we go through the loop at least
+    //       once.
+    uint64_t l_Count = 1;
+    if (!isServerDead(pJob, pHandle, pContribId))
+    {
+        l_Count = getDeclareServerDeadCount();
+    }
+
+    return l_Count;
+};
 
 int WRKQMGR::getThrottleRate(LVKey* pLVKey, uint64_t& pRate)
 {
@@ -1149,13 +1198,11 @@ int WRKQMGR::getWrkQE_WithCanceledExtents(WRKQE* &pWrkQE)
                 if (qe->second->wrkq->size())
                 {
                     // This workqueue has at least one entry.
-                    // Get the LVKey and taginfo2 for this work item...
-                    l_Key = (qe->second->getWrkQ()->front()).getLVKey();
-                    l_LV_Info = metadata.getLV_Info(&l_Key);
-                    if (l_LV_Info && ((l_LV_Info->getNextExtentInfo().getExtent()->isCanceled())))
+                    l_LV_Info = qe->second->getLV_Info();
+                    if (l_LV_Info && ((l_LV_Info->hasCanceledExtents())))
                     {
-                        // Next extent is canceled...  Don't look any further
-                        // and simply return this work queue.
+                        // Next extent to be transferred is canceled...
+                        // Don't look any further and simply return this work queue.
                         pWrkQE = qe->second;
                         pWrkQE->dump("debug", "getWrkQE_WithCanceledExtents(): Extent being cancelled ");
                         break;
@@ -1174,6 +1221,33 @@ int WRKQMGR::getWrkQE_WithCanceledExtents(WRKQE* &pWrkQE)
     return rc;
 }
 
+int WRKQMGR::isServerDead(const BBJob pJob, const uint64_t pHandle, const int32_t pContribId)
+{
+    int rc = 0;
+
+    HeartbeatEntry* l_HeartbeatEntry = getHeartbeatEntry(ContribIdFile::isServicedBy(pJob, pHandle, pContribId));
+    if (l_HeartbeatEntry)
+    {
+        rc = l_HeartbeatEntry->serverDeclaredDead(declareServerDeadCount);
+    }
+
+    return rc;
+}
+
+HeartbeatEntry* WRKQMGR::getHeartbeatEntry(const string& pHostName)
+{
+    for (auto it=heartbeatData.begin(); it!=heartbeatData.end(); ++it)
+    {
+        if (it->first == pHostName)
+        {
+            return &(it->second);
+        }
+    }
+
+    return (HeartbeatEntry*)0;
+}
+
+
 void WRKQMGR::loadBuckets()
 {
     for (map<LVKey,WRKQE*>::iterator qe = wrkqs.begin(); qe != wrkqs.end(); ++qe)
@@ -1190,21 +1264,51 @@ void WRKQMGR::loadBuckets()
 // NOTE: pLVKey is not currently used, but can come in as null.
 void WRKQMGR::lock(const LVKey* pLVKey, const char* pMethod)
 {
+    stringstream errorText;
+
     if (!transferQueueIsLocked())
     {
+        // NOTE: We must obtain the lock before we verify the lock protocol.
+        //       Otherwise, the issuingWorkItem check will fail...
         pthread_mutex_lock(&lock_transferqueue);
+        transferQueueLocked = pthread_self();
+
+        // Verify lock protocol
+        if (issuingWorkItem)
+        {
+            FL_Write(FLError, lockPV_TQLock, "WRKQMGR::lock: Transfer queue lock being obtained while a work item is being issued",0,0,0,0);
+            errorText << "WRKQMGR::lock: Transfer queue lock being obtained while a work item is being issued";
+            LOG_ERROR_TEXT_AND_RAS(errorText, bb.internal.lockprotocol.locktq)
+#if 0
+            abort();
+#endif
+        }
+
         if (strstr(pMethod, "%") == NULL)
         {
-            if (pLVKey)
+            if (l_LockDebugLevel == "info")
             {
-                LOG(bb,debug) << "TRNFR_Q:   LOCK <- " << pMethod << ", " << *pLVKey;
+                if (pLVKey)
+                {
+                    LOG(bb,info) << "TRNFR_Q:   LOCK <- " << pMethod << ", " << *pLVKey;
+                }
+                else
+                {
+                    LOG(bb,info) << "TRNFR_Q:   LOCK <- " << pMethod << ", unknown LVKey";
+                }
             }
             else
             {
-                LOG(bb,debug) << "TRNFR_Q:   LOCK <- " << pMethod << ", unknown LVKey";
+                if (pLVKey)
+                {
+                    LOG(bb,debug) << "TRNFR_Q:   LOCK <- " << pMethod << ", " << *pLVKey;
+                }
+                else
+                {
+                    LOG(bb,debug) << "TRNFR_Q:   LOCK <- " << pMethod << ", unknown LVKey";
+                }
             }
         }
-        transferQueueLocked = pthread_self();
 
         pid_t tid = syscall(SYS_gettid);  // \todo eventually remove this.  incurs syscall for each log entry
         FL_Write(FLMutex, lockTransferQ, "lockTransfer.  threadid=%ld",tid,0,0,0);
@@ -1416,7 +1520,7 @@ void WRKQMGR::pinLock(const LVKey* pLVKey, const char* pMethod)
         if (!lockPinned)
         {
             lockPinned = 1;
-            if (strstr(pMethod, "%") == NULL)
+            if (l_LockDebugLevel == "info")
             {
                 if (pLVKey)
                 {
@@ -1425,6 +1529,17 @@ void WRKQMGR::pinLock(const LVKey* pLVKey, const char* pMethod)
                 else
                 {
                     LOG(bb,info) << "TRNFR_Q:   LOCK PINNED <- " << pMethod << ", unknown LVKey";
+                }
+            }
+            else
+            {
+                if (pLVKey)
+                {
+                    LOG(bb,debug) << "TRNFR_Q:   LOCK PINNED <- " << pMethod << ", " << *pLVKey;
+                }
+                else
+                {
+                    LOG(bb,debug) << "TRNFR_Q:   LOCK PINNED <- " << pMethod << ", unknown LVKey";
                 }
             }
         }
@@ -1476,7 +1591,7 @@ void WRKQMGR::processAllOutstandingHP_Requests(const LVKey* pLVKey)
         }
         else
         {
-            unlockTransferQueue(pLVKey, "processAllOutstandingHP_Requests");
+            unlockLocalMetadata(pLVKey, "processAllOutstandingHP_Requests");
             {
                 // NOTE: Currently set to log after 5 seconds of not being able to process all async requests, and every 10 seconds thereafter...
                 if ((i++ % 20) == 10)
@@ -1486,7 +1601,7 @@ void WRKQMGR::processAllOutstandingHP_Requests(const LVKey* pLVKey)
                 }
                 usleep((useconds_t)500000);
             }
-            lockTransferQueue(pLVKey, "processAllOutstandingHP_Requests");
+            lockLocalMetadata(pLVKey, "processAllOutstandingHP_Requests");
         }
     }
 
@@ -1508,7 +1623,7 @@ void WRKQMGR::processThrottle(LVKey* pLVKey, WRKQE* pWrkQE, BBLV_Info* pLV_Info,
     {
         if(pWrkQE)
         {
-            pThreadDelay = pWrkQE->processBucket(pLV_Info, pTagId, pExtentInfo);
+            pThreadDelay = pWrkQE->processBucket(pTagId, pExtentInfo);
             pTotalDelay = (pThreadDelay ? ((double)(throttleTimerPoppedCount-throttleTimerCount-1) * (Throttle_TimeInterval*1000000)) + pThreadDelay : 0);
         }
     }
@@ -1546,7 +1661,7 @@ void WRKQMGR::removeWorkItem(WRKQE* pWrkQE, WorkID& pWorkItem)
         }
 
         // Remove the work item from the work queue
-        pWrkQE->removeWorkItem(pWorkItem, VALIDATE_WORK_QUEUE);
+        pWrkQE->removeWorkItem(pWorkItem, DO_NOT_VALIDATE_WORK_QUEUE);
 
         // Update the last processed work queue in the manager
         setLastQueueProcessed(pWrkQE->getLVKey());
@@ -1728,28 +1843,78 @@ void WRKQMGR::setThrottleTimerPoppedCount(const double pTimerInterval)
     return;
 }
 
+int WRKQMGR::startProcessingHP_Request(AsyncRequest& pRequest)
+{
+    int rc = 0;
+
+    string l_Data = pRequest.getData();
+    for (auto it=inflightHP_Requests.begin(); it!=inflightHP_Requests.end(); ++it)
+    {
+        if (*it == l_Data)
+        {
+            rc = -1;
+            break;
+        }
+    }
+
+    if (!rc)
+    {
+        inflightHP_Requests.push_back(l_Data);
+    }
+
+    return rc;
+}
+
 // NOTE: pLVKey is not currently used, but can come in as null.
 void WRKQMGR::unlock(const LVKey* pLVKey, const char* pMethod)
 {
+    stringstream errorText;
+
     if (transferQueueIsLocked())
     {
         if (!lockPinned)
         {
+            // Verify lock protocol
+            if (issuingWorkItem)
+            {
+                FL_Write(FLError, lockPV_TQUnlock, "WRKQMGR::unlock: Transfer queue lock being released while a work item is being issued",0,0,0,0);
+                errorText << "WRKQMGR::unlock: Transfer queue lock being released while a work item is being issued";
+                LOG_ERROR_TEXT_AND_RAS(errorText, bb.internal.lockprotocol.unlocktq)
+#if 0
+                abort();
+#endif
+            }
+
             pid_t tid = syscall(SYS_gettid);  // \todo eventually remove this.  incurs syscall for each log entry
             FL_Write(FLMutex, unlockTransferQ, "unlockTransfer.  threadid=%ld",tid,0,0,0);
 
-            transferQueueLocked = 0;
             if (strstr(pMethod, "%") == NULL)
             {
-                if (pLVKey)
+                if (l_LockDebugLevel == "info")
                 {
-                    LOG(bb,debug) << "TRNFR_Q: UNLOCK <- " << pMethod << ", " << *pLVKey;
+                    if (pLVKey)
+                    {
+                        LOG(bb,info) << "TRNFR_Q: UNLOCK <- " << pMethod << ", " << *pLVKey;
+                    }
+                    else
+                    {
+                        LOG(bb,info) << "TRNFR_Q: UNLOCK <- " << pMethod << ", unknown LVKey";
+                    }
                 }
                 else
                 {
-                    LOG(bb,debug) << "TRNFR_Q: UNLOCK <- " << pMethod << ", unknown LVKey";
+                    if (pLVKey)
+                    {
+                        LOG(bb,debug) << "TRNFR_Q: UNLOCK <- " << pMethod << ", " << *pLVKey;
+                    }
+                    else
+                    {
+                        LOG(bb,debug) << "TRNFR_Q: UNLOCK <- " << pMethod << ", unknown LVKey";
+                    }
                 }
             }
+
+            transferQueueLocked = 0;
             pthread_mutex_unlock(&lock_transferqueue);
         }
         else
@@ -1777,7 +1942,7 @@ void WRKQMGR::unpinLock(const LVKey* pLVKey, const char* pMethod)
         if (lockPinned)
         {
             lockPinned = 0;
-            if (strstr(pMethod, "%") == NULL)
+            if (l_LockDebugLevel == "info")
             {
                 if (pLVKey)
                 {
@@ -1786,6 +1951,17 @@ void WRKQMGR::unpinLock(const LVKey* pLVKey, const char* pMethod)
                 else
                 {
                     LOG(bb,info) << "TRNFR_Q:   LOCK UNPINNED <- " << pMethod << ", unknown LVKey";
+                }
+            }
+            else
+            {
+                if (pLVKey)
+                {
+                    LOG(bb,debug) << "TRNFR_Q:   LOCK UNPINNED <- " << pMethod << ", " << *pLVKey;
+                }
+                else
+                {
+                    LOG(bb,debug) << "TRNFR_Q:   LOCK UNPINNED <- " << pMethod << ", unknown LVKey";
                 }
             }
         }
@@ -1827,7 +2003,8 @@ void WRKQMGR::updateHeartbeatData(const string& pHostName)
 {
     uint64_t l_Count = 0;
 
-    string l_CurrentTime = HeartbeatEntry::getHeartbeatCurrentTime();
+    struct timeval l_CurrentTime = timeval {.tv_sec=0, .tv_usec=0};
+    HeartbeatEntry::getCurrentTime(l_CurrentTime);
     map<string, HeartbeatEntry>::iterator it = heartbeatData.find(pHostName);
     if (it != heartbeatData.end())
     {
@@ -1852,7 +2029,8 @@ void WRKQMGR::updateHeartbeatData(const string& pHostName, const string& pServer
         l_Count = (it->second).getCount();
     }
 
-    string l_CurrentTime = HeartbeatEntry::getHeartbeatCurrentTime();
+    struct timeval l_CurrentTime = timeval {.tv_sec=0, .tv_usec=0};
+    HeartbeatEntry::getCurrentTime(l_CurrentTime);
     HeartbeatEntry l_Entry = HeartbeatEntry(++l_Count, l_CurrentTime, pServerTimeStamp);
 
     heartbeatData[pHostName] = l_Entry;
@@ -1990,7 +2168,7 @@ int WRKQMGR::verifyAsyncRequestFile(char* &pAsyncRequestFileName, int &pSeqNbr, 
                             {
                                 rc = -1;
                                 stringstream l_Temp;
-                                l_Temp << "0" << oct << (bfs::status(l_Path)).permissions();
+                                l_Temp << "0" << oct << (bfs::status(l_Path)).permissions() << dec;
                                 errorText << "Verification of permissions failed for bbServer metadata directory " << l_Path.c_str() \
                                           << ". Requires read and execute for all users, but permissions are " \
                                           << l_Temp.str() << ".";
